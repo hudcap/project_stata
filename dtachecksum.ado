@@ -43,7 +43,7 @@ program define _checksum_sliceout, rclass
 	
 	* Compute CRC checksum while omitting timestamp
 	tempfile csum_outfile
-	qui !{ head -c `startuntil' `using' & tail -c +`restartat' `using'; } | cksum > `csum_outfile'
+	qui !{ head -c `startuntil' `using'; tail -c +`restartat' `using'; } | cksum > `csum_outfile'
 	
 	* Load CRC checksum
 	file open csum_result using `csum_outfile', read text
