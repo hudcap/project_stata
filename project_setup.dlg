@@ -1,53 +1,143 @@
-/*
-	project, setup
-   
-*!	VERSION 1.1	16nov2013
+/*	
+--------------------------------------------------------------------------------
 
+	File    :  project_setup.dlg
+
+	Author  :  Robert Picard, picard@netbox.com
+	
+	Version :  2.0.0  (02nov2015)
+	
+	Package :  -project- package, from SSC (Robert Picard, picard@netbox.com)
+	
+	Site    :  SSC (type -ssc install project- to install)
+	
+	Purpose :  Build the command to setup/update a project. It is invoqued by
+	           by typing -project, setup- in Stata's Command window
+
+--------------------------------------------------------------------------------
 */
+
 
 VERSION 9.2
 
-INCLUDE _std_large
-INCLUDE _ht150
-POSITION . . _dlgwd _dlght
 
-HELP hlp1, view("help project")
-RESET res1
-COPY copy1
+// ******************  position and size of dialog box  ************************
 
-OK ok1, label("OK")
-CANCEL can1, label("Cancel")
+POSITION . . 500 190
 
-DIALOG main, tabtitle("Main") ///
-	label("Setup a project's directory") 
-	
+
+// ***********************  dialog definitions  *********************************
+
+DIALOG main, tabtitle("Main") label("Setup a project") 
 BEGIN
 
-  	GROUPBOX	gb_using  _lft  _top  _iwd  _ht8, ///
-		label("Please select the project's master do-file")
+  	GROUPBOX gb_using  ///
+  		10 10 -20 70, ///
+  		label("Select the project's master do-file")
 	
-	TEXT	tx_using	_ilft	_ls	_inwd	.,	///
-		label("master do-file:")
-	
-	FILE	fi_using	@		_ss	@		.,	///
+	FILE fi_using								///
+		20 40 -20 .,							///
 		label("Browse...")						///
 		filter("Stata do-files (*.do)|*.do")	///
 		error("master do-file")					///
+		option(setmaster)						///
 		nomemory
 	
-	CHECKBOX ck_text	@	_ls	@	.,	///
-		option(textlog)					///
-		label("Plain text log files")
+  	GROUPBOX gb_other  							///
+  		10 +50 +20 90,							///
+  		label("Other options")
+	
+	CHECKBOX ck_plaintext						///
+		20 +25 20 .,							///
+		option(textlog)							///
+		label("Enable plain text log files")	///
+		clickon("script plaintext_on")			///
+		clickoff("script plaintext_off")
+		
+	TEXT tx_plaintext							///
+		+20 @ 200 ., 							///
+		label("Plain text log files") 
+
+	CHECKBOX ck_relax ///
+		20 +25 20 .,							///
+		label("Enable relax mode")				///
+		clickon("script relax_on")				///
+		clickoff("script relax_off")
+
+	TEXT tx_relax								///
+		+20 @ 250 ., 							///
+		label("Relax dependency checks for files over (in MB)") 
+
+	SPINNER	sp_relax 							///
+		320 @ 70 .,								///
+		min(1)									///
+		max(999999)								///
+		default(100)							///
+		option(relax)							///
+		label("Threshold to relax checks")
 
 END
 
+
+// ************************  i-action definitions  *****************************
+
+SCRIPT relax_on
+BEGIN
+	main.sp_relax.enable
+	main.tx_relax.enable
+END
+
+SCRIPT relax_off
+BEGIN
+	main.sp_relax.disable
+	main.tx_relax.disable
+END
+
+SCRIPT plaintext_on
+BEGIN
+	main.tx_plaintext.enable
+END
+
+SCRIPT plaintext_off
+BEGIN
+	main.tx_plaintext.disable
+END
+
+
+// ****************************  Helper buttons  *******************************
+
+HELP hlp1, view("help project")
+RESET res1
+
+
+// ****************************  U-action buttons  *****************************
+
+COPY copy1
+CANCEL can1, label("Cancel")
+OK ok1, label("OK")
+
+
+// ***************************  U-action definition  ***************************
 PROGRAM command
 BEGIN
+
 	require main.fi_using
-	put "project , setmaster("
-	put `"""'
-	put main.fi_using
-	put `"")"'
-	put " "
-	option main.ck_text
+	
+	put "project "
+	
+	beginoptions
+	
+		optionarg /oquoted main.fi_using
+		
+		option main.ck_plaintext
+		
+		if main.ck_relax {
+		
+			optionarg main.sp_relax
+			
+		}
+		
+	endoptions
 END
+
+

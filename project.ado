@@ -1,4 +1,4 @@
-*! version 1.3.1  22dec2013  picard@netbox.com
+*! version 2.0.0b4  09jul2018  Robert Picard, picard@netbox.com
 program define project
 /*
 --------------------------------------------------------------------------------
@@ -9,12 +9,9 @@ reroutes each call to the appropriate local program.
 --------------------------------------------------------------------------------
 */
 
-	// avoid version control but support version 9.2 to 13
-	if _caller() < 9.2 version 9.2
-	version `c(stata_version)'
-	if c(stata_version) > 13 version 13
+	version 9.2
 
-	
+
 	syntax	[name(name=pname id="Project Name")], ///
 			[					///
 								/// --------- project database ----------------
@@ -44,8 +41,8 @@ reroutes each call to the appropriate local program.
 			preserve			/// preserve user data when running build directives
 			TEXTlog             /// log file in plain text format
 			SMCLlog             /// log file in SMCL format
+			relax(string)		/// relax dependency checks for files over (in MB)
 			]
-
 
 
 	local command_list setup setmaster plist pclear cd ///
@@ -108,30 +105,19 @@ find it irrespective of the current directory.
 
 --------------------------------------------------------------------------------
 */
-
-	// search along the current ado-path
-	capture findfile "project.ado"
-	local builtemp "`r(fn)'"
-	local builtemp : subinstr local builtemp "project.ado" "project_BUILD_TEMPFILE.dta"
-
 	// check using -describe- to avoid having to -preserve- user data
-	cap describe using "`builtemp'"
+	cap describe using `"$PROJECT_buildtemp"'
 	if !_rc {
 	
 		nobreak {
 		
-			use "`builtemp'", clear
+			use `"$PROJECT_buildtemp"', clear
 			local pname : char _dta[pname]
 			dis as err `"project "`pname'" is currently being built"' ///
 				" - command not available"
 				
-			cap erase "`builtemp'"
-			if _rc {
-				dis as err "... could not erase build temporary file"
-				dis as err `"you must manually delete "`builtemp'""'
-				exit _rc
-			}
-			else dis as err "current build cancelled"
+			cap erase `"$PROJECT_buildtemp"'
+			dis as err "current build cancelled"
 			
 			clear
 		}
@@ -166,7 +152,7 @@ the project_setmaster command. See the "project_setup.dlg".
 end
 
 
-program define project_pathname, rclass
+program define get_pathname, rclass
 /*
 --------------------------------------------------------------------------------
 
@@ -242,6 +228,102 @@ Separate a file name from its path name. Return the full path name.
 end
 
 
+program define get_database_of_projects
+/*
+--------------------------------------------------------------------------------
+
+Look for the database of projects along the adopath. 
+
+--------------------------------------------------------------------------------
+*/
+
+	capture findfile "project.dta"
+	if _rc {
+
+		clear
+		gen str pname = ""
+		gen str path  = ""
+		gen str plog  = ""
+		gen str relax = "."
+		char pname[tname] "Name"
+		char path[tname] "Full path to directory"
+		char plog[tname] "Log Type"
+		char relax[tname] "Relax (MB)"
+
+	}
+	else {
+	
+		local projects "`r(fn)'"
+		
+		cap use "`projects'", clear
+		if _rc {
+			dis as err "Could not open the database of projects"
+			exit _rc
+		}
+
+		cap confirm variable plog
+		if _rc {
+			gen str plog  = "SMCL"
+			char plog[tname] "Log Type"
+		}
+	
+		cap confirm variable relax
+		if _rc {
+			gen relax  = "."
+			char relax[tname] "Relax (MB)"
+		}
+		
+	}
+	
+	cap confirm string variable pname path plog relax
+	local myrc = _rc
+		
+	cap isid pname, sort
+	if _rc | `myrc' {
+		dis as err "Sorry but the database of projects appears corrupted."
+		dis as err `"Please delete "`projects'" manually and"'
+		dis as err "a new one will be created on the next run."
+		exit _rc
+	}
+
+end
+
+
+program define save_database_of_projects
+/*
+--------------------------------------------------------------------------------
+
+The database of projects is saved in the same directory that this ado file
+is located. 
+
+--------------------------------------------------------------------------------
+*/
+
+	
+	cap confirm string variable pname path plog relax
+	local myrc = _rc
+		
+	cap isid pname, sort
+	if _rc | `myrc' {
+		dis as err "The database of projects appears corrupted."
+		dis as err `"Please delete "`projects'" manually and"'
+		dis as err "a new one will be created on the next run."
+		exit _rc			
+	}
+	
+	qui findfile "project.ado"
+	local projects = regexr("`r(fn)'", "project.ado$", "project.dta")
+	
+	cap saveold "`projects'", replace
+	if _rc {
+		dis as err "Could not save the database of projects"
+		exit _rc
+	}
+	
+
+end
+
+
 program define project_setmaster
 /*
 --------------------------------------------------------------------------------
@@ -259,11 +341,11 @@ directory that contains the version of -project- that is currently running.
 	// this is not a build directive
 	exit_if_in_a_build
 	
-	syntax , setmaster(string) [TEXTlog SMCLlog]
+	syntax , setmaster(string) [TEXTlog SMCLlog relax(string)]
 	
 	
 	// Separate the filename from the file path
-	qui project_pathname "`setmaster'"
+	qui get_pathname "`setmaster'"
 	local fname "`r(fname)'"
 	local fullpath  "`r(fullpath)'"
 	local len : length local fullpath
@@ -298,70 +380,42 @@ directory that contains the version of -project- that is currently running.
 	
 	local logtype = cond("`textlog'" == "","SMCL","plain text")
 	
+	if "`relax'" == "" local relax .
+	if "`relax'" != "." {
+		capture confirm integer number `relax'
+		if _rc {
+			dis as err "The relax option must specify an integer threshold (in MB)"
+			exit _rc
+		}
+		capture assert `relax' >= 1
+		if _rc {
+			dis as err "The minimum size for the relax option is 1 MB"
+			exit _rc
+		}		
+	}
 	
 	preserve
 	
-	// Search along the ado-path for the dataset of projects
-	capture findfile "project.dta"
-	if !_rc {
-		local projects "`r(fn)'"
-	}
-	else {
-		// if not found, create it in the same directory as -project-
-		capture findfile "project.ado"
-		local projects "`r(fn)'"
-		local projects : subinstr local projects "project.ado" "project.dta"
-		
-		clear
-		gen str pname = ""
-		gen str path  = ""
-		gen str plog  = ""
-		char pname[tname] "Name"
-		char path[tname] "Full path to directory"
-		char plog[tname] "Log Type"
-
-		cap saveold "`projects'"
-		if _rc {
-			dis as err "Could not save the database of projects"
-			exit _rc
-		}
-	}
 	
+	get_database_of_projects
 	
-	// Add the project
-	cap use "`projects'", clear
-	if _rc {
-		dis as err "Could not open the database of projects"
-		exit _rc
-	}
 	cap drop if pname == "`pname'"
 	qui set obs `=_N+1'
 	qui replace pname = "`pname'" in l
 	qui replace path  = "`fullpath'" in l
+	qui replace plog = "`logtype'" in l
+	qui replace relax = "`relax'" in l
 	
-	// new feature; make backward compatible
-	cap replace plog = "`logtype'" in l
-	if _rc {
-		gen str plog  = "SMCL"		// default for all projects
-		char plog[tname] "Log Type"
-		qui replace plog = "`logtype'" in l
-	}
-	
-	sort pname
-	cap saveold "`projects'", replace
-	if _rc {
-		dis as err "Could not save the dataset of projects"
-		exit _rc
-	}
-	
+	save_database_of_projects
+
 
 	// list using our table routines
 	qui keep if pname == "`pname'"
 	rename path fpath
 	rename pname fname
-	project_table_setup	fname plog, title1("Project")
+	table_setup	fname plog relax, title1("Project")
 	char fname[style] res
-	project_table_line fname plog, line(1)
+	table_line fname plog relax, line(1)
 	dis "{c BLC}{hline `: char _dta[tablewidth]'}{c BRC}"
 	
 end
@@ -373,8 +427,7 @@ program define get_project_directory, rclass
 --------------------------------------------------------------------------------
 
 Given a project name, this program retrieves the path to the directory that 
-contains the master do-file. The program also returns the default log type
-for the project.
+contains the master do-file. 
 
 --------------------------------------------------------------------------------
 */
@@ -382,44 +435,26 @@ for the project.
 	syntax name(name=pname id="Project Name")
 	
 	
-	// Search along the ado-path for the dataset of projects
-	capture findfile "project.dta"
-	if _rc {
-		dis as err "The dataset of projects was not found."
-		dis as err "Use the {bf:{dialog project_setup:setup}} option " ///
-			"to define new projects"
-		exit _rc
-	}
-
-	cap use "`r(fn)'", clear
-	if _rc{
-		dis as err "Could not open the database of projects"
-		exit _rc
-	}
-	
-	cap confirm string variable pname path
-	if _rc{
-		dis as err "The database of projects is missing the expected variables"
-		exit _rc
-	}
-	
+	get_database_of_projects
+		
 	qui keep if pname == "`pname'"
-	if  _N == 1 {
-		local projectdir = path
-		return local projectdir "`projectdir'"
-		return local pfiles "`projectdir'/`pname'_files.dta"
-		return local plinks "`projectdir'/`pname'_links.dta"
-		cap local plogtype = plog
-		if "`plogtype'" == "" local plogtype "SMCL"	
-		return local plog "`plogtype'"
-	}
 	
-	if "`projectdir'" == "" {
+	if  _N == 0 {
 		dis as err `"project "`pname'" not found"'
 		dis as err "Use the {bf:{dialog project_setup:setup}} option " ///
 			"to define new projects"
 		exit 198
 	}
+	
+	local projectdir = path
+	
+	return local projectdir "`projectdir'"
+	return local pfiles "`projectdir'/`pname'_files.dta"
+	return local plinks "`projectdir'/`pname'_links.dta"
+	
+	return local plog = plog
+	
+	return local relax = relax
 	
 end
 
@@ -441,52 +476,28 @@ List one/all projects in the database of projects.
 	syntax [name(name=pname id="Project Name")], plist
 	
 
-	// Search along the ado-path for the dataset of projects
-	cap findfile "project.dta"
-	if _rc {
-		dis as err "The dataset of projects was not found."
-		dis as err "Use the {bf:{dialog project_setup:setup}} option " ///
-			"to define new projects"
-		exit _rc
-	}
-	local projects "`r(fn)'"
-	
 	preserve
 	
 	
-	use "`projects'", clear
+	get_database_of_projects
 	
 	
 	if "`pname'" != "" {
 		qui keep if pname == "`pname'"
-		if !_N {
+		if _N == 0 {
 			dis as err `"project "`pname'" not found"'
 			exit 459
 		}
 	}
 	
-	if !_N {
+	if _N == 0 {
 		dis as err "no project defined"
 		dis as err "Use the {bf:{dialog project_setup:setup}} option " ///
 			"to define new projects"
 		exit 2000
 	}
 	
-	
-	// new feature; make backwards compatible
-	cap confirm var plog
-	if _rc {
-		gen str plog  = "SMCL"		// default for all projects
-		char plog[tname] "Log Type"
-		sort pname
-		cap saveold "`projects'", replace
-		if _rc {
-			dis as err "Could not save the dataset of projects"
-			exit _rc
-		}
-	}
-	
-	
+		
 	// Adjust variable names and use our table routines
 	rename path fpath
 	rename pname fname	
@@ -494,12 +505,12 @@ List one/all projects in the database of projects.
 	if _N == 1 local title "Project"
 	else local title "Projects"
 
-	project_table_setup	fname plog, title1("`title'")
+	table_setup	fname plog relax, title1("`title'")
 	char fname[style] res
 	
 	sort fname
 	forvalues i = 1/`c(N)' {
-		project_table_line fname plog, line(`i')
+		table_line fname plog relax, line(`i')
 	}
 	
 	dis "{c BLC}{hline `: char _dta[tablewidth]'}{c BRC}"
@@ -522,20 +533,12 @@ Remove a project in the database of projects.
 	syntax name(name=pname id="Project Name"), pclear
 	
 	
-	// Search along the ado-path for the dataset of projects
-	cap findfile "project.dta"
-	if _rc {
-		dis as err "The dataset of projects was not found."
-		exit _rc
-	}
-	local projects "`r(fn)'"
-	
-	
 	preserve
 	
 	
-	use "`projects'", clear
-
+	get_database_of_projects
+	
+	
 	qui count if pname == "`pname'"
 	if r(N) == 0 {
 		dis as err `"project "`pname'" not found"'
@@ -545,12 +548,7 @@ Remove a project in the database of projects.
 		qui drop if pname == "`pname'"
 	}
 	
-	sort pname
-	cap saveold "`projects'", replace
-	if _rc {
-		dis as err "Could not save the dataset of projects"
-		exit _rc
-	}
+	save_database_of_projects
 	
 end
 
@@ -570,19 +568,11 @@ Change Stata's current working directory to the project's directory
 	syntax name(name=pname id="Project Name"), cd
 	
 	
-	// Search along the ado-path for the dataset of projects
-	cap findfile "project.dta"
-	if _rc {
-		dis as err "The dataset of projects was not found."
-		exit _rc
-	}
-	local projects "`r(fn)'"
-	
-	
 	preserve
 	
 	
-	use "`projects'", clear
+	get_database_of_projects
+
 
 	qui keep if pname == "`pname'"
 	if _N == 0 {
@@ -609,19 +599,32 @@ Build a project.
 	// this is not a build directive; can't build from within a build!
 	exit_if_in_a_build
 	
-	syntax name(name=pname id="Project Name"), build [TEXTlog SMCLlog]
+	syntax name(name=pname id="Project Name"), build [TEXTlog SMCLlog relax(string)]
 	
 	
 	// restore to nothing if error/Break
 	clear
 	preserve
 	
+	if "`relax'" != "" & "`relax'" != "." {
+		capture confirm integer number `relax'
+		if _rc {
+			dis as err "The relax option must specify an integer threshold (in MB)"
+			exit _rc
+		}
+		capture assert `relax' >= 1
+		if _rc {
+			dis as err "The minimum size for the relax option is 1 MB"
+			exit _rc
+		}		
+	}
 		
 	get_project_directory `pname'
 	local pdir   "`r(projectdir)'"
 	local pfiles "`r(pfiles)'"
 	local plinks "`r(plinks)'"
 	local plog   "`r(plog)'"
+	if "`relax'" == "" local relax  "`r(relax)'"
 	dis _n(2) as txt "Project directory : " as res "`pdir'" _n
 	
 	
@@ -740,20 +743,20 @@ Build a project.
 	clear
 	char _dta[pname] "`pname'"
 	char _dta[pdir] "`pdir'"
-	local d = date("`bdate'","`=cond(c(version) < 10,"dmy","DMY")'")
+	local d = date("`bdate'","dmy")
 	char _dta[date] `d'
 	char _dta[time] `btime'
 	char _dta[plog] "`plog'"
+	char _dta[relax] "`relax'"
 
-	capture findfile "project.ado"
-	local builtemp "`r(fn)'"
-	local builtemp : subinstr local builtemp "project.ado" "project_BUILD_TEMPFILE.dta"
-	qui save "`builtemp'", emptyok
+	tempfile buildtemp
+	global PROJECT_buildtemp `"`buildtemp'"'
+	qui save `"$PROJECT_buildtemp"', emptyok	
+
+	global S_ADO UPDATES;BASE;SITE;.;`"`pdir'/ado"';PERSONAL;PLUS;OLDPLACE
 	
-
-	// restore the standard ado search path and drop all user programs
-	global S_ADO `"`"UPDATES"';`"BASE"';`"SITE"';`"."';`"PERSONAL"';`"PLUS"';`"OLDPLACE"'"'
 	program drop _all
+	qui mata: mata mlib index
 	
 			
 	dis as text "Build start: " ///
@@ -768,8 +771,9 @@ Build a project.
 	capture noi project_do , do("`pdir'/`pname'.do") `textlog' `smcllog'
 	local build_rc = _rc
 	
-	// erase the build temporary file
-	cap erase "`builtemp'"
+	//
+	global S_ADO UPDATES;BASE;SITE;.;`"`pdir'/ado"';PERSONAL;PLUS;OLDPLACE
+	global PROJECT_buildtemp
 	
 	if `build_rc' {
 		exit `build_rc'
@@ -945,20 +949,21 @@ This can only be done if the previous build was successful.
 	clear
 	char _dta[pname] "`pname'"
 	char _dta[pdir] "`pdir'"
-	local d = date("`bdate'","`=cond(c(version) < 10,"dmy","DMY")'")
+	local d = date("`bdate'","dmy")
 	char _dta[date] `d'
 	char _dta[time] `btime'
 	char _dta[plog] "`plog'"
+	char _dta[relax] "."	// override project's settings when replicating
 
-	capture findfile "project.ado"
-	local builtemp "`r(fn)'"
-	local builtemp : subinstr local builtemp "project.ado" "project_BUILD_TEMPFILE.dta"
-	qui save "`builtemp'", emptyok	
+	tempfile buildtemp
+	global PROJECT_buildtemp `"`buildtemp'"'
+	qui save `"$PROJECT_buildtemp"', emptyok	
 	
 		
-	// restore the standard ado search path and drop all user programs
-	global S_ADO `"`"UPDATES"';`"BASE"';`"SITE"';`"."';`"PERSONAL"';`"PLUS"';`"OLDPLACE"'"'
+	global S_ADO UPDATES;BASE;SITE;.;`"`pdir'/ado"';PERSONAL;PLUS;OLDPLACE
+	
 	program drop _all
+	qui mata: mata mlib index
 	
 	
 	dis _n as text "Replicate build start: " ///
@@ -970,8 +975,9 @@ This can only be done if the previous build was successful.
 	capture noi project_do , do("`pdir'/`pname'.do") `textlog' `smcllog'
 	local build_rc = _rc
 	
-	// erase the build temporary file
-	cap erase "`builtemp'"
+	//
+	global S_ADO UPDATES;BASE;SITE;.;`"`pdir'/ado"';PERSONAL;PLUS;OLDPLACE
+	global PROJECT_buildtemp
 	
 	if `build_rc' {
 		exit `build_rc'
@@ -1104,10 +1110,10 @@ This can only be done if the previous build was successful.
 							cvs[`i'] != cvs00[`i']
 			}
 			else {
-				qui version 9.2: datasignature, fast
+				qui datasignature, fast
 				local newsig `r(datasignature)'
 				qui use "`old_path'/`fname'", clear
-				qui version 9.2: datasignature, fast
+				qui datasignature, fast
 				local chng = "`r(datasignature)'" != "`newsig'"
 			}
 		}
@@ -1143,7 +1149,7 @@ This can only be done if the previous build was successful.
 	if "`smcllog'" != "" local logext "smcl"
 
 	// prepare a report
-	local d : dis %dCYND date("`bdate'","`=cond(c(version) < 10,"dmy","DMY")'")
+	local d : dis %dCYND date("`bdate'","dmy")
 	local t = subinstr("`btime'",":","",.)
 	local logfile "replication_report_`d'_`t'.`logext'"
 	capture mkdir "`repdir'"
@@ -1166,7 +1172,7 @@ This can only be done if the previous build was successful.
 		
 		// Setup the table
 		local tablevars fname flen csum status chngdate chngtime
-		project_table_setup	`tablevars', ///
+		table_setup	`tablevars', ///
 			title1("Replication Report") ///
 			title2("`c(N)' files, in order they are created in the build")
 		local tw : char _dta[tablewidth]
@@ -1188,7 +1194,7 @@ This can only be done if the previous build was successful.
 				char status[style] txt
 			}
 	
-			project_table_line `tablevars', line(`i')
+			table_line `tablevars', line(`i')
 	
 		}
 		
@@ -1229,12 +1235,8 @@ Run a do-file from within a build.  The master do-file is called from
 
 	syntax , do(string) [preserve TEXTlog SMCLlog]
 	
-	
 	// This is a build directive; check that we are currently running one
-	capture findfile "project.ado"
-	local builtemp "`r(fn)'"
-	local builtemp : subinstr local builtemp "project.ado" "project_BUILD_TEMPFILE.dta"
-	cap describe using "`builtemp'"
+	cap describe using `"$PROJECT_buildtemp"'
 	if _rc {
 		dis as err "no project being built"
 		exit 198
@@ -1245,14 +1247,15 @@ Run a do-file from within a build.  The master do-file is called from
 	preserve
 
 
-	use "`builtemp'", clear
+	use `"$PROJECT_buildtemp"', clear
 	local pname  : char _dta[pname]
 	local pdir   : char _dta[pdir]
 	local bdate  : char _dta[date]
 	local btime  : char _dta[time]
 	local plog   : char _dta[plog]
+	local relax  : char _dta[relax]
 	
-	if "`pname'" == "" | "`pdir'" == "" | "`bdate'" == "" | "`btime'" == "" | "`plog'" == "" {
+	if "`pname'" == "" | "`pdir'" == "" | "`bdate'" == "" | "`btime'" == "" | "`plog'" == ""  | "`relax'" == "" {
 		dis as err "build parameters corrupted - this should never happen"
 		exit 459
 	}
@@ -1263,7 +1266,7 @@ Run a do-file from within a build.  The master do-file is called from
 
 
 	// Force the user to run do-files from within the project directory
-	qui project_pathname "`do'"
+	qui get_pathname "`do'"
 	local dofile "`r(fname)'"
 	local fullpath "`r(fullpath)'"
 	if "`pdir'" == "`fullpath'" local dopath ""
@@ -1318,11 +1321,11 @@ Run a do-file from within a build.  The master do-file is called from
 
 	// Add the do-file to the list of currently active do-files.
 	// Get the file number of the enclosing do-file, missing if this is the master
-	qui use "`builtemp'", clear
+	qui use `"$PROJECT_buildtemp"', clear
 	local dolist : char _dta[dolist]
 	gettoken enclosing_do : dolist
 	char _dta[dolist]  `fdo' `dolist'
-	qui save "`builtemp'", replace emptyok
+	qui save `"$PROJECT_buildtemp"', replace emptyok
 	
 
 	// Do not run the same do-file more than once.
@@ -1398,23 +1401,29 @@ Run a do-file from within a build.  The master do-file is called from
 				if "`fpath'" == "" local f "`fname'"
 				else local f "`fpath'/`fname'"
 				if relpath[`i'] local f "`pdir'/`f'"
-				capture checksum "`f'"
-				if _rc {
+				
+				cap get_fsize "`f'"
+				if _rc | (flen[`i'] != r(fsize)) {
 					local do_it 1
 				}
 				else {
-					local d = date("`c(current_date)'","`=cond(c(version) < 10,"dmy","DMY")'")
+				
+					local d = date("`c(current_date)'","dmy")
 					local t "`c(current_time)'"
-					if csum[`i'] != r(checksum) | ///
-					   flen[`i'] != r(filelen) | ///
-					   cvs[`i']  != r(version) {
-						qui replace chngdate   = `d' in `i'
-						qui replace chngtime   = "`t'" in `i'
-						qui replace archiveflag = 1 in `i'
-						qui replace csum = r(checksum) in `i'
-						qui replace flen = r(filelen) in `i'
-						qui replace cvs  = r(version) in `i'
-						local do_it 1
+					if (r(fsize) <= `relax' * 1000000) {
+						// checksum #1
+						capture checksum2 "`f'"
+						if csum[`i'] != r(checksum) | ///
+						   flen[`i'] != r(filelen) | ///
+						   cvs[`i']  != r(version) {
+							qui replace chngdate   = `d' in `i'
+							qui replace chngtime   = "`t'" in `i'
+							qui replace archiveflag = 1 in `i'
+							qui replace csum = r(checksum) in `i'
+							qui replace flen = r(filelen) in `i'
+							qui replace cvs  = r(version) in `i'
+							local do_it 1
+						}
 					}
 					qui replace cdate = `d' in `i'
 					qui replace ctime = "`t'" in `i'
@@ -1426,7 +1435,7 @@ Run a do-file from within a build.  The master do-file is called from
 			qui keep if update
 			drop update notdo
 			sort fno
-			project_clear_dta_char
+			clear_dta_char
 			qui merge fno using "`pfiles'"
 			drop _merge
 			sort fno
@@ -1445,13 +1454,21 @@ Run a do-file from within a build.  The master do-file is called from
 		project_dolink , linktype(1) linkfile("`dofile'")
 		
 		// Start the do-file with a clean slate
-		project_clear_globals
+		local buildtemp `"$PROJECT_buildtemp"'
+		clear_globals
+		global PROJECT_buildtemp `"`buildtemp'"'
 		clear
 		mata: mata clear
 		timer clear
 		program drop _all
-		set seed 123456789
 		
+		if `c(stata_version)' >= 14 {
+			set rng default
+			set seed_mt64 123456789
+			set seed_kiss32 123456789
+		} 
+		else set seed 123456789
+
 		// Suspend log of the enclosing do-file and start a new one
 		if "`enclosing_do'" != "" qui log off plog_`enclosing_do'
 		capture log close plog_`fdo'
@@ -1462,7 +1479,10 @@ Run a do-file from within a build.  The master do-file is called from
 		else restore, not
 
 		// run the do-file; close the do-file if a break/error occured
-		capture noisily do "`dofile'"
+		version `c(stata_version)': capture noisily do "`dofile'"
+		
+		// in case the do-file clobbered our global
+		global PROJECT_buildtemp `"`buildtemp'"'
 		
 		// error/break handling
 		local rc = _rc		
@@ -1573,11 +1593,11 @@ Run a do-file from within a build.  The master do-file is called from
 	}
 	
 	//  Remove the file number from the dolist
-	qui use "`builtemp'", clear
+	qui use `"$PROJECT_buildtemp"', clear
 	local dolist : char _dta[dolist]
 	gettoken last rest : dolist
 	char _dta[dolist]  "`rest'"
-	qui save "`builtemp'", replace emptyok
+	qui save `"$PROJECT_buildtemp"', replace emptyok
 	
 end
 
@@ -1753,23 +1773,21 @@ project_creates. The calling programs handle -preserve-
 
 
 	// This is a build directive; check that we are currently running one
-	capture findfile "project.ado"
-	local builtemp "`r(fn)'"
-	local builtemp : subinstr local builtemp "project.ado" "project_BUILD_TEMPFILE.dta"
-	cap describe using "`builtemp'"
+	cap describe using `"$PROJECT_buildtemp"'
 	if _rc {
 		dis as err "no project being built"
 		exit 198
 	}
 	
-	use "`builtemp'", clear
+	use `"$PROJECT_buildtemp"', clear
 	local pname  : char _dta[pname]
 	local pdir   : char _dta[pdir]
 	local dolist : char _dta[dolist]
 	local bdate  : char _dta[date]
 	local btime  : char _dta[time]
-	
-	if "`pname'" == "" | "`pdir'" == "" | "`bdate'" == "" | "`btime'" == "" {
+	local relax  : char _dta[relax]
+
+	if "`pname'" == "" | "`pdir'" == "" | "`bdate'" == "" | "`btime'" == "" | "`relax'" == "" {
 		dis as err "build parameters corrupted - this should never happen"
 		exit 459
 	}
@@ -1780,7 +1798,7 @@ project_creates. The calling programs handle -preserve-
 
 
 	// Separate the filename from the file path
-	qui project_pathname "`linkfile'"
+	qui get_pathname "`linkfile'"
 	local fname "`r(fname)'"
 	local fullpath  "`r(fullpath)'"
 	if "`pdir'" == "`fullpath'" local relpath ""
@@ -1837,12 +1855,26 @@ project_creates. The calling programs handle -preserve-
 	tempname csum flen cvs
 	if `linktype' == 4 | cdate[`nobs'] < `bdate' | ///
 			(cdate[`nobs'] == `bdate' & ctime[`nobs'] < "`btime'") {
-		qui checksum "`fullpath'/`fname'"
-		scalar `csum' = r(checksum)
-		scalar `flen' = r(filelen)
-		scalar `cvs'  = r(version)
-		return add
-		local d = date("`c(current_date)'","`=cond(c(version) < 10,"dmy","DMY")'")
+		
+		local recompute 1
+		if `linktype' != 4 & `relax' != . & cdate[`nobs'] != 0 {
+			get_fsize "`fullpath'/`fname'"
+			if (r(fsize) == flen[`nobs']) & (r(fsize) > `relax' * 1000000) {
+				scalar `csum' = csum[`nobs']
+				scalar `flen' = flen[`nobs']
+				scalar `cvs'  = cvs[`nobs']
+				local recompute 0
+			}
+		}
+		
+		if `recompute' {
+			// checksum #2
+			qui checksum2 "`fullpath'/`fname'"
+			scalar `csum' = r(checksum)
+			scalar `flen' = r(filelen)
+			scalar `cvs'  = r(version)
+		}
+		local d = date("`c(current_date)'","dmy")
 		local t "`c(current_time)'"
 		if csum[`nobs'] != `csum' | ///
 		   flen[`nobs'] != `flen' | ///
@@ -1864,10 +1896,10 @@ project_creates. The calling programs handle -preserve-
 		scalar `csum' = csum[`nobs']
 		scalar `flen' = flen[`nobs']
 		scalar `cvs'  = cvs[`nobs']
-		return scalar checksum = `csum'
-		return scalar filelen = `flen'
-		return scalar version = `cvs'
 	}
+	return scalar checksum = `csum'
+	return scalar filelen = `flen'
+	return scalar version = `cvs'
 
 	
 	// Check against current links to see if it is appropriate to 
@@ -1984,10 +2016,7 @@ functions. The -preserve- option can be used to overide the default behavior.
 	
 	
 	// This is a build directive; check that we are currently running one
-	capture findfile "project.ado"
-	local builtemp "`r(fn)'"
-	local builtemp : subinstr local builtemp "project.ado" "project_BUILD_TEMPFILE.dta"
-	cap describe using "`builtemp'"
+	cap describe using `"$PROJECT_buildtemp"'
 	if _rc {
 		dis as err "no project being built"
 		exit 198
@@ -2001,7 +2030,7 @@ functions. The -preserve- option can be used to overide the default behavior.
 	}
 	preserve
 
-	use "`builtemp'", clear
+	use `"$PROJECT_buildtemp"', clear
 	local pname  : char _dta[pname]
 	local pdir   : char _dta[pdir]
 	local dolist : char _dta[dolist]
@@ -2159,7 +2188,7 @@ manually changed or if there is a bug in this program.
 		exit 459
 	}	
 	
-	local start_date = date("`: char _dta[start_date]'","`=cond(c(version) < 10,"dmy","DMY")'")
+	local start_date = date("`: char _dta[start_date]'","dmy")
 	if mi(`start_date') {
 		dis as err  "Bad or missing build start date in `plinks'"
 		exit 459
@@ -2197,7 +2226,7 @@ manually changed or if there is a bug in this program.
 	}
 	
 	
-	local test = date("`: char _dta[end_date]'","`=cond(c(version) < 10,"dmy","DMY")'")
+	local test = date("`: char _dta[end_date]'","dmy")
 	if mi(`test') local build_ok 0
 
 	
@@ -2306,7 +2335,7 @@ none of the files have changed, then the build is validated.
 	// prepare date and time stamp
 	local cdate "`c(current_date)'" 
 	local ctime "`c(current_time)'"
-	local d : dis %dCYND date("`cdate'","`=cond(c(version) < 10,"dmy","DMY")'")
+	local d : dis %dCYND date("`cdate'","dmy")
 	local t = subinstr("`ctime'",":","",.)
 	local datetime "`d'_`t'"
 	
@@ -2355,7 +2384,7 @@ none of the files have changed, then the build is validated.
 		
 		// Setup the table
 		local tablevars fname flen csum status chngdate chngtime
-		project_table_setup	`tablevars', ///
+		table_setup	`tablevars', ///
 			title1("Alphabetical Index (`c(N)' files)")
 		local tw : char _dta[tablewidth]
 		
@@ -2379,25 +2408,33 @@ none of the files have changed, then the build is validated.
 			if "`fpath'" == "" local ff "`fname'"
 			else local ff "`fpath'/`fname'"
 			if relpath[`i'] local ff "`pdir'/`ff'"
-			capture checksum "`ff'"
+			
+			// checksum #3
+			capture get_fsize "`ff'"
 			if _rc {
 				qui replace status = "missing" in `i'
 				char status[style] err
 				local ++ndif
 			}
-			else if csum0[`i'] != r(checksum) | /// string version created by project_table_setup
-			   flen0[`i'] != r(filelen)  | ///
-			   cvs[`i']  != r(version) {
+			else if r(fsize) != flen0[`i'] {
 				qui replace status = "changed" in `i'
 				char status[style] err
 				local ++ndif
 			}
 			else {
-				qui replace status = "ok" in `i'
-				char status[style] res
+				qui checksum2 "`ff'"
+				if csum0[`i'] != r(checksum) | flen0[`i'] != r(filelen)  | cvs[`i']  != r(version) {
+					qui replace status = "changed" in `i'
+					char status[style] err
+					local ++ndif
+				}
+				else {
+					qui replace status = "ok" in `i'
+					char status[style] res
+				}
 			}
 	
-			project_table_line `tablevars', line(`i')
+			table_line `tablevars', line(`i')
 	
 		}
 		dis "{c BLC}{hline `tw'}{c BRC}"
@@ -2478,7 +2515,7 @@ changed since the last time the archive task was run.
 	// prepare date and time stamp
 	local cdate "`c(current_date)'" 
 	local ctime "`c(current_time)'"
-	local d : dis %dCYND date("`cdate'","`=cond(c(version) < 10,"dmy","DMY")'")
+	local d : dis %dCYND date("`cdate'","dmy")
 	local t = subinstr("`ctime'",":","",.)
 	local datetime "`d'_`t'"
 	
@@ -2508,7 +2545,7 @@ changed since the last time the archive task was run.
 	// get file information for files linked to in the most recent build
 	keep flink
 	rename flink fno
-	project_clear_dta_char
+	clear_dta_char
 	qui merge fno using "`pfiles'"
 	qui keep if _merge == 3
 	drop _merge
@@ -2540,7 +2577,7 @@ changed since the last time the archive task was run.
 			
 			// Setup the table
 			local tablevars fname flen csum chngdate chngtime
-			project_table_setup	`tablevars', title1("`title'")
+			table_setup	`tablevars', title1("`title'")
 	
 		
 			// Choose variable styles
@@ -2587,7 +2624,7 @@ changed since the last time the archive task was run.
 					exit _rc
 				}
 				
-				project_table_line `tablevars', line(`i')
+				table_line `tablevars', line(`i')
 	
 			}
 			
@@ -2701,7 +2738,7 @@ the build could be skipped the next time around.
 	// prepare date and time stamp
 	local cdate "`c(current_date)'" 
 	local ctime "`c(current_time)'"
-	local d : dis %dCYND date("`cdate'","`=cond(c(version) < 10,"dmy","DMY")'")
+	local d : dis %dCYND date("`cdate'","dmy")
 	local t = subinstr("`ctime'",":","",.)
 	local datetime "`d'_`t'"
 	
@@ -2745,7 +2782,7 @@ the build could be skipped the next time around.
 	local sharedate : char _dta[share_`sharewith'_date]
 	local sharetime : char _dta[share_`sharewith'_time]
 	
-	local nsharedate = date("`sharedate'","`=cond(c(version) < 10,"dmy","DMY")'")
+	local nsharedate = date("`sharedate'","dmy")
 	if mi(`nsharedate') | "`alltime'" != "" local nsharedate 0
 	
 	
@@ -2786,7 +2823,7 @@ the build could be skipped the next time around.
 			
 			// Setup the table
 			local tablevars fname flen csum chngdate chngtime
-			project_table_setup	`tablevars', title1("`title'")
+			table_setup	`tablevars', title1("`title'")
 	
 		
 			// Choose variable styles
@@ -2835,7 +2872,7 @@ the build could be skipped the next time around.
 					}
 				}
 				
-				project_table_line `tablevars', line(`i')
+				table_line `tablevars', line(`i')
 	
 			}
 			
@@ -2925,7 +2962,7 @@ recursively and archives files that are not linked to the project.
 	// prepare date and time stamp
 	local cdate "`c(current_date)'" 
 	local ctime "`c(current_time)'"
-	local d : dis %dCYND date("`cdate'","`=cond(c(version) < 10,"dmy","DMY")'")
+	local d : dis %dCYND date("`cdate'","dmy")
 	local t = subinstr("`ctime'",":","",.)
 	local datetime "`d'_`t'"
 	
@@ -2948,7 +2985,7 @@ recursively and archives files that are not linked to the project.
 	sort flink
 	qui by flink: keep if _n == 1
 	rename flink fno
-	project_clear_dta_char
+	clear_dta_char
 	qui merge fno using "`pfiles'"
 	qui keep if _merge == 3
 	drop _merge
@@ -3007,7 +3044,7 @@ recursively and archives files that are not linked to the project.
 	keep fno
 	rename fno fdo
 	sort fdo
-	project_clear_dta_char
+	clear_dta_char
 	qui merge fdo using "`plinks'"
 	qui keep if _merge == 3
 	drop _merge
@@ -3179,7 +3216,7 @@ This program removes all files created by the project in the previous build.
 	// prepare date and time stamp
 	local cdate "`c(current_date)'" 
 	local ctime "`c(current_time)'"
-	local d : dis %dCYND date("`cdate'","`=cond(c(version) < 10,"dmy","DMY")'")
+	local d : dis %dCYND date("`cdate'","dmy")
 	local t = subinstr("`ctime'",":","",.)
 	local datetime "`d'_`t'"
 	
@@ -3323,7 +3360,7 @@ List project files in various ways
 		// include date and time stamp in log file name
 		local cdate "`c(current_date)'" 
 		local ctime "`c(current_time)'"
-		local d : dis %dCYND date("`cdate'","`=cond(c(version) < 10,"dmy","DMY")'")
+		local d : dis %dCYND date("`cdate'","dmy")
 		local t = subinstr("`ctime'",":","",.)
 		local logfile "`w'_`d'_`t'.`logext'"
 		log using "`listdir'/`logfile'", name(list_log)
@@ -3398,7 +3435,7 @@ List project files, according to the order they appear in the build.
 
 	// Setup the table
 	local tablevars fname flen linktype
-	project_table_setup	`tablevars', title1("Build Sequence (`c(N)' links)")
+	table_setup	`tablevars', title1("Build Sequence (`c(N)' links)")
 	local tw : char _dta[tablewidth]
 
 
@@ -3415,7 +3452,7 @@ List project files, according to the order they appear in the build.
 	
 		if dofile[`i'] dis "{c |}{space `tw'}{c |}"
 		
-		project_table_line `tablevars', line(`i')
+		table_line `tablevars', line(`i')
 
 		if level[`i'] > level[`i'+1] dis "{c |}{space `tw'}{c |}"
 	}
@@ -3511,7 +3548,7 @@ created.
 		// Setup the table
 		local tablevars fname flen csum chngdate chngtime
 		qui count if ftype == `nt'
-		project_table_setup	`tablevars', title1("`title`nt'' (`r(N)' files)")
+		table_setup	`tablevars', title1("`title`nt'' (`r(N)' files)")
 	
 	
 		// Show files in alphabetical order
@@ -3526,7 +3563,7 @@ created.
 		qui keep if ftype == `nt'
 		
 		forvalues i = 1/`c(N)' {
-			project_table_line `tablevars', line(`i')
+			table_line `tablevars', line(`i')
 		}
 	
 	
@@ -3574,7 +3611,7 @@ List project files alphabetically
 	
 	// Setup the table
 	local tablevars fname flen csum chngdate chngtime
-	project_table_setup	`tablevars', title1("Alphabetical Index (`c(N)' files)")
+	table_setup	`tablevars', title1("Alphabetical Index (`c(N)' files)")
 
 
 	// Show files in alphabetical order
@@ -3588,7 +3625,7 @@ List project files alphabetically
 	
 
 	forvalues i = 1/`c(N)' {
-		project_table_line `tablevars', line(`i')
+		table_line `tablevars', line(`i')
 	}
 
 
@@ -3637,7 +3674,7 @@ List project files by directory
 
 	// Setup the table
 	local tablevars fname flen csum chngdate chngtime
-	project_table_setup	`tablevars', ///
+	table_setup	`tablevars', ///
 		title1(" Alphabetical Index by Directory (`c(N)' files)")
 	local tw : char _dta[tablewidth]
 
@@ -3654,7 +3691,7 @@ List project files by directory
 
 	forvalues i = 1/`c(N)' {
 	
-		project_table_line `tablevars', line(`i')
+		table_line `tablevars', line(`i')
 		
 		if fpath[`i'] != fpath[`i'+1] & `i' != 1 & `i' != `c(N)' ///
 				dis "{c LT}{hline `tw'}{c RT}"
@@ -3772,7 +3809,7 @@ List project files alphabetically with a list of all do-files that link to them.
 	
 	// Setup the table
 	local tablevars fname flen csum linktype chngdate chngtime
-	project_table_setup	`tablevars', ///
+	table_setup	`tablevars', ///
 		title1("Linked File to Do-file Concordance Table")
 	local tw : char _dta[tablewidth]
 	
@@ -3786,7 +3823,7 @@ List project files alphabetically with a list of all do-files that link to them.
 		if dofile[`i'] char fname[style] txt
 		else char fname[style] res
 		
-		project_table_line `tablevars', line(`i')
+		table_line `tablevars', line(`i')
 
 		if flink[`i'] != flink[`i'+1] & `i' != 1 & `i' != `c(N)' ///
 			dis "{c LT}{hline `tw'}{c RT}"
@@ -3856,7 +3893,7 @@ are moved in and out of the project.
 	
 	// Setup the table
 	local tablevars fname flen csum status chngdate chngtime
-	project_table_setup	`tablevars', title1("`title' (`c(N)' files)")
+	table_setup	`tablevars', title1("`title' (`c(N)' files)")
 
 
 	// Show files in order they would be archived
@@ -3874,7 +3911,7 @@ are moved in and out of the project.
 		if status[`i'] == "ok" char status[style] res
 		else char status[style] err
 		
-		project_table_line `tablevars', line(`i')
+		table_line `tablevars', line(`i')
 
 	}
 
@@ -3947,7 +3984,7 @@ build) that would be moved to an archive directory.
 end
 
 
-program define project_table_setup
+program define table_setup
 /*
 --------------------------------------------------------------------------------
 
@@ -4020,7 +4057,7 @@ that will have to be wrapped around.
 end
 
 
-program define project_table_line
+program define table_line
 /*
 --------------------------------------------------------------------------------
 
@@ -4061,8 +4098,7 @@ This program prints one line in the results, wrapping the file path as needed.
 end
 
 
-
-program define project_clear_globals
+program define clear_globals
 /*
 --------------------------------------------------------------------------------
 
@@ -4076,9 +4112,7 @@ Drop all global macros without loosing local macros
 end
 
 
-
-
-program define project_clear_dta_char
+program define clear_dta_char
 /*
 --------------------------------------------------------------------------------
 
@@ -4096,16 +4130,42 @@ in the project files and links datasets.
 end
 
 
+program define get_fsize, rclass
+
+	args f
+
+	tempname fhandle
+	
+	file open `fhandle' using "`f'", read
+	
+	file seek `fhandle' eof
+	return scalar fsize = r(loc)
+	
+	file close `fhandle'
+	
+end
 
 
+program define checksum2, rclass
+/*
+--------------------------------------------------------------------------------
 
+As of Jul 9, 2018, there's a bug in all versions of Stata whereby the file
+size returned is incorrect when the target file is over 4GB. This is a wrapper
+around -checksum- that returns the correct file size.
 
+--------------------------------------------------------------------------------
+*/
+	args f
 
-
-
-
-
-
-
-
-
+	checksum "`f'"
+	return add
+	
+	// get file size using -file- instead
+	tempname fhandle
+	file open `fhandle' using "`f'", read
+	file seek `fhandle' eof
+	return scalar filelen = r(loc)
+	file close `fhandle'
+	
+end
