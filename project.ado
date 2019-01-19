@@ -4169,3 +4169,124 @@ around -checksum- that returns the correct file size.
 	file close `fhandle'
 	
 end
+
+
+version 14.1
+mata:
+mata set matastrict on
+
+void get_database_of_projects() {
+///
+/// Load "project_plist.mmat" from the same directory as this ado file.
+///
+
+	external string matrix project_plist
+	external string rowvector project_plist_tname
+	
+	// Get file path
+	string scalar filepath
+	filepath = findfile("project_plist.mmat")
+
+	// Load project list into matrices
+	if (filepath=="") {
+		project_plist = J(0,4,"")
+		project_plist_tname = ("Name", "Full path to directory", ///
+							   "Log Type", "Relax (MB)")
+	}
+	else {
+		real scalar fh
+		fh = fopen(filepath, "r")
+		project_plist = fgetmatrix(fh)
+		project_plist_tname = fgetmatrix(fh)
+		fclose(fh)
+	}
+	
+	sortandvalidate_database_of_projects()
+	
+}
+
+void save_database_of_projects() {
+///
+/// Save "project_plist.mmat" in same directory as this ado file.
+///
+
+	external string matrix project_plist
+	external string rowvector project_plist_tname
+	
+	sortandvalidate_database_of_projects()
+	
+	// Get file path
+	string scalar filepath_ado, filepath_plist
+	filepath_ado = findfile("project.ado")
+	filepath_plist = regexr(filepath_ado, "project.ado$", "project_plist.mmat")
+	
+	// Output
+	real scalar fh
+	unlink(filepath_plist)
+	fh = fopen(filepath_plist, "w")
+	fputmatrix(fh, project_plist) 
+	fputmatrix(fh, project_plist_tname)
+	fclose(fh)
+	
+	// Clear Mata globals
+	rmexternal("project_plist")
+	rmexternal("project_plist_tname")
+
+}
+
+void sortandvalidate_database_of_projects() {
+///
+/// Check that project list has correct dimensions and unique names
+///
+
+	external string matrix project_plist
+	external string rowvector project_plist_tname
+
+	// Correct dimensions
+	assert(cols(project_plist)==4)
+	assert(cols(project_plist_tname)==4)
+	assert(rows(project_plist_tname)==1)
+	
+	// Project names are unique
+	_sort(project_plist,1)
+	real scalar r
+	for (r=2; r<=rows(project_plist); r++) {
+		assert(project_plist[r,1]!=project_plist[r-1,1])
+	}
+
+}
+
+void convert_database_of_projects() {
+///
+/// Convert project list from Stata .dta file to Mata matrix file
+///
+
+	external string matrix project_plist
+	external string rowvector project_plist_tname
+	
+	// Get file path
+	string scalar filepath
+	filepath = findfile("project.dta")
+	
+	// Load project list into matrices
+	if (filepath=="") {
+		project_plist = J(0,4,"")
+		project_plist_tname = ("Name", "Full path to directory", ///
+							   "Log Type", "Relax (MB)")
+	}
+	else {
+		stata("get_database_of_projects")
+		project_plist = st_sdata(., .)
+		project_plist_tname = (st_global("pname[tname]"), ///
+							   st_global("path[tname]"), ///
+							   st_global("plog[tname]"), ///
+							   st_global("relax[tname]") ///
+							  )
+	}
+	
+	// Save project list as Mata matrix file
+	save_database_of_projects()
+
+}
+	
+end
