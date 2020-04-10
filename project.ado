@@ -1753,6 +1753,23 @@ functions. The -preserve- option can be used to overide the default behavior.
 	
 	project_dolink , linktype(4) linkfile("`creates'")
 	
+	** If file path given ends in .dta, strip timestamp (et. al.)
+	if substr("`creates'", -4) == ".dta" {
+		_strip_nonreproducibility_dta "`creates'"
+	}
+	** If file path has no extension, strip timestamp (et. al.)
+	capture confirm file "`creates'"
+	if _rc !=0 {
+		capture confirm file "`creates'.dta"
+		if _rc == 0 {
+			_strip_nonreproducibility_dta "`creates'.dta"
+		}
+		else {
+		** This is an error case.  We could add in more handling, but for now it will assert 0 to force exit
+		assert 0
+		}
+	}
+	
 	if "`preserve'" != "" cap estimates restore `hold'
 	
 end
