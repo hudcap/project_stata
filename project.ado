@@ -1621,7 +1621,7 @@ to overide the default behavior.
 --------------------------------------------------------------------------------
 */
 
-	syntax , original(string) [preserve]
+	syntax , original(string)
 		
 		
 	qui{
@@ -1672,7 +1672,7 @@ used to overide the default behavior.
 --------------------------------------------------------------------------------
 */
 
-	syntax , uses(string) [preserve]
+	syntax , uses(string) 
 	
 	
 	
@@ -1729,7 +1729,7 @@ to overide the default behavior.
 --------------------------------------------------------------------------------
 */
 
-	syntax , relies_on(string) [preserve]
+	syntax , relies_on(string)
 		
 	qui{
 	
