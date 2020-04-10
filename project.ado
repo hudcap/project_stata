@@ -311,8 +311,8 @@ is located.
 		exit _rc			
 	}
 	
-	qui findfile "project.ado"
-	local projects = regexr("`r(fn)'", "project.ado$", "project.dta")
+	qui findfile "profile.do"
+	local projects = regexr("`r(fn)'", "profile.do$", "project.dta")
 	
 	cap saveold "`projects'", replace
 	if _rc {
