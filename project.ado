@@ -1624,17 +1624,27 @@ to overide the default behavior.
 	syntax , original(string) [preserve]
 		
 		
-	// restore to nothing if error/Break unless user wants its data back
-	if "`preserve'" == "" clear
-	else {
-		tempname hold
-		cap estimates store `hold'
+	qui{
+	
+		* Save current frame as a local called "main_frame"
+		pwf
+		local main_frame `r(currentframe)'
+		
+		* Switch to temp frame 
+		cap: frame drop project_dev_frame
+		frame create project_dev_frame 
+		frame change project_dev_frame 
+
 	}
-	preserve
 	
 	project_dolink , linktype(1) linkfile("`original'")
 	
-	if "`preserve'" != "" cap estimates restore `hold'
+	
+	* Go back to starting frame and delete temp frame 
+	qui{
+		frame change `main_frame'
+		frame drop project_dev_frame
+	}
 		
 end
 
@@ -1664,17 +1674,29 @@ used to overide the default behavior.
 
 	syntax , uses(string) [preserve]
 	
-	// restore to nothing if error/Break unless user wants its data back
-	if "`preserve'" == "" clear
-	else {
-		tempname hold
-		cap estimates store `hold'
+	
+	
+	qui{
+	
+		* Save current frame as a local called "main_frame"
+		pwf
+		local main_frame `r(currentframe)'
+		
+		* Switch to temp frame 
+		cap: frame drop project_dev_frame
+		frame create project_dev_frame 
+		frame change project_dev_frame 
+
 	}
-	preserve
 	
 	project_dolink , linktype(2) linkfile("`uses'")
 	
-	if "`preserve'" != "" cap estimates restore `hold'
+	
+	* Go back to starting frame and delete temp frame 
+	qui{
+		frame change `main_frame'
+		frame drop project_dev_frame
+	}
 		
 end
 
@@ -1709,17 +1731,29 @@ to overide the default behavior.
 
 	syntax , relies_on(string) [preserve]
 		
-	// restore to nothing if error/Break unless user wants its data back
-	if "`preserve'" == "" clear
-	else {
-		tempname hold
-		cap estimates store `hold'
+	qui{
+	
+		* Save current frame as a local called "main_frame"
+		pwf
+		local main_frame `r(currentframe)'
+		
+		* Switch to temp frame 
+		cap: frame drop project_dev_frame
+		frame create project_dev_frame 
+		frame change project_dev_frame 
+
 	}
-	preserve
 	
 	project_dolink , linktype(3) linkfile("`relies_on'")
 	
-	if "`preserve'" != "" cap estimates restore `hold'
+	
+	* Go back to starting frame and delete temp frame 
+	qui{
+		frame change `main_frame'
+		frame drop project_dev_frame
+	}
+		
+	
 
 end
 
