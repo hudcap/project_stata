@@ -1,6 +1,6 @@
 program _strip_nonreproducibility_dta
 	syntax anything(name=filename)
-	python: python_strip_nonreproducibility_dta("`filename'")
+	python: python_strip_nonreproducibility_dta(r"`filename'")
 end
 
 python:
