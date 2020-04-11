@@ -1621,7 +1621,11 @@ to overide the default behavior.
 --------------------------------------------------------------------------------
 */
 
-	syntax , original(string)
+	syntax , original(string) [preserve]
+	
+	if ("`preserve'"!="") {
+		di as text "project: 'preserve' option is no longer necessary in build directives"
+	}	
 		
 		
 	qui{
@@ -1672,7 +1676,12 @@ used to overide the default behavior.
 --------------------------------------------------------------------------------
 */
 
-	syntax , uses(string) 
+	syntax , uses(string) [preserve]
+	
+	if ("`preserve'"!="") {
+		di as text "project: 'preserve' option is no longer necessary in build directives"
+	}	
+		
 	
 	
 	
@@ -1729,7 +1738,12 @@ to overide the default behavior.
 --------------------------------------------------------------------------------
 */
 
-	syntax , relies_on(string)
+	syntax , relies_on(string) [preserve]
+	
+	if ("`preserve'"!="") {
+		di as text "project: 'preserve' option is no longer necessary in build directives"
+	}	
+		
 		
 	qui{
 	
@@ -1775,7 +1789,11 @@ functions. The -preserve- option can be used to overide the default behavior.
 --------------------------------------------------------------------------------
 */
 
-	syntax , creates(string) 
+	syntax , creates(string) [preserve]
+	
+	if ("`preserve'"!="") {
+		di as text "project: 'preserve' option is no longer necessary in build directives"
+	}	
 	
 	qui{
 	
