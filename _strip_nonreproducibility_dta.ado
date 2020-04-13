@@ -1,6 +1,13 @@
 program _strip_nonreproducibility_dta
 	syntax anything(name=filename)
-	python: python_strip_nonreproducibility_dta(r"`filename'")
+	
+	dtaversion "`filename'"
+	if `r(version)' == 118 {
+		python: python_strip_nonreproducibility_dta(r"`filename'")
+	}
+	else {
+		di "Cannot strip non-reproducibility for file: `filename' because it is saved from Stata version `r(version)'.  This feature is only written for version 118 saves (for stata version 14-16 saves with at most 2^15 variables)."
+	}
 end
 
 python:

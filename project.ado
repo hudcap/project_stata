@@ -311,8 +311,7 @@ is located.
 		exit _rc			
 	}
 	
-	qui findfile "profile.do"
-	local projects = regexr("`r(fn)'", "profile.do$", "project.dta")
+	local projects `c(sysdir_personal)'project.dta
 	
 	cap saveold "`projects'", replace
 	if _rc {
