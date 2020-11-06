@@ -170,11 +170,8 @@ Separate a file name from its path name. Return the full path name.
 	// never allow temporary files
 	tempfile f
 	local tempdir : subinstr local f "\" "/", all
-	local tempdir = regexr("`tempdir'","[^/]*$","")	
-	local fcheck : subinstr local fn "`tempdir'" ""
-	local len1 : length local fcheck
-	local len2 : length local fn
-	if `len1' != `len2' {
+	local tempdir = regexr("`tempdir'","[^/]*$","")
+	if (regexm(`"`fn'"',"^`tempdir'")==1) {
 		dis as err `"Temporary file not allowed: "`fn'""'
 		exit 198
 	}
