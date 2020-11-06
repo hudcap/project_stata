@@ -1,4 +1,5 @@
-*! version 2.0.0b4  09jul2018  Robert Picard, picard@netbox.com
+*! version 3.0.0b1  06nov2020  Robert Picard, picard@netbox.com
+*! minor edits by Michael Stepner, software@michaelstepner.com
 program define project
 /*
 --------------------------------------------------------------------------------
