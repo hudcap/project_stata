@@ -333,7 +333,7 @@ This command will usually be called from the dialog that is brought up by the
 directly with a full or relative path.
 
 The project full path is stored in a Stata dataset that is saved in the
-directory that contains the version of -project- that is currently running. 
+Stata PERSONAL directory. 
 
 --------------------------------------------------------------------------------
 */
@@ -1611,45 +1611,19 @@ do-file (and all upstream do-files) to a file that is not created by the
 project. The linked file is used in some way and therefore the results of the 
 project could change (including log files) if the linked file changes.
 Therefore any change to the linked file will require that the do-file (and
-all upstream do-file) be rerun
-
-Because this is typically used just before inputting data (and therefore 
-clearing the data in memory), the default is to not to preserve the use data
-while this program performs its functions. The -preserve- option can be used
-to overide the default behavior.
+all upstream do-file) be rerun.
 
 --------------------------------------------------------------------------------
 */
 
 	syntax , original(string) [preserve]
 	
-	if ("`preserve'"!="") {
-		di as text "project: 'preserve' option is no longer necessary in build directives"
-	}	
+	if ("`preserve'"!="") di as text "project: 'preserve' option is no longer necessary in build directives"
 		
-		
-	qui{
-	
-		* Save current frame as a local called "main_frame"
-		pwf
-		local main_frame `r(currentframe)'
-		
-		* Switch to temp frame 
-		cap: frame drop project_dev_frame
-		frame create project_dev_frame 
-		frame change project_dev_frame 
-
-	}
-	
-	project_dolink , linktype(1) linkfile("`original'")
-	
-	
-	* Go back to starting frame and delete temp frame 
-	qui{
-		frame change `main_frame'
-		frame drop project_dev_frame
-	}
-		
+	tempname project_db
+	frame create `project_db'
+	frame `project_db':	project_dolink , linktype(1) linkfile("`original'")
+			
 end
 
 
@@ -1668,44 +1642,16 @@ Note that is it not necessary to declare such a link in the do-file that
 actually creates the linked file. This is typically used with files that are
 created by a previously run do-file.
 
-Because this is typically used just before loading a Stata dataset (and
-therefore clearing the data in memory), the default is to not to preserve the
-use data while this program performs its functions. The -preserve- option can be
-used to overide the default behavior.
-
 --------------------------------------------------------------------------------
 */
 
 	syntax , uses(string) [preserve]
 	
-	if ("`preserve'"!="") {
-		di as text "project: 'preserve' option is no longer necessary in build directives"
-	}	
+	if ("`preserve'"!="") di as text "project: 'preserve' option is no longer necessary in build directives"
 		
-	
-	
-	
-	qui{
-	
-		* Save current frame as a local called "main_frame"
-		pwf
-		local main_frame `r(currentframe)'
-		
-		* Switch to temp frame 
-		cap: frame drop project_dev_frame
-		frame create project_dev_frame 
-		frame change project_dev_frame 
-
-	}
-	
-	project_dolink , linktype(2) linkfile("`uses'")
-	
-	
-	* Go back to starting frame and delete temp frame 
-	qui{
-		frame change `main_frame'
-		frame drop project_dev_frame
-	}
+	tempname project_db
+	frame create `project_db'
+	frame `project_db':	project_dolink , linktype(2) linkfile("`uses'")
 		
 end
 
@@ -1720,7 +1666,7 @@ project. The linked file is NOT used by the do-file and therefore changes in the
 linked file would not alter results. However, the linked file's content is
 relevant to what the do-file does in some way. The linked file could be notes on
 how an original file was obtained, documentation about it, the algorithm used by
-the code, etc. While such links are strickly speaking not necessary, they are a
+the code, etc. While such links are strictly speaking not necessary, they are a
 good practice. The directive inserts in the log file the checksum of the linked
 file. If the linked file changes, this would mean that the do-file's log file
 would change and therefore the do-file must be rerun.
@@ -1729,45 +1675,16 @@ An additional incentive/bonus to linking such files is that -project- knows that
 they are related to the project. The cleanup task will leave such files in place
 instead of moving them to an archive.
 
-Because this is typically used just before inputting data (and therefore 
-clearing the data in memory), the default is to not to preserve the use data
-while this program performs its functions. The -preserve- option can be used
-to overide the default behavior.
-
-
 --------------------------------------------------------------------------------
 */
 
 	syntax , relies_on(string) [preserve]
 	
-	if ("`preserve'"!="") {
-		di as text "project: 'preserve' option is no longer necessary in build directives"
-	}	
+	if ("`preserve'"!="") di as text "project: 'preserve' option is no longer necessary in build directives"
 		
-		
-	qui{
-	
-		* Save current frame as a local called "main_frame"
-		pwf
-		local main_frame `r(currentframe)'
-		
-		* Switch to temp frame 
-		cap: frame drop project_dev_frame
-		frame create project_dev_frame 
-		frame change project_dev_frame 
-
-	}
-	
-	project_dolink , linktype(3) linkfile("`relies_on'")
-	
-	
-	* Go back to starting frame and delete temp frame 
-	qui{
-		frame change `main_frame'
-		frame drop project_dev_frame
-	}
-		
-	
+	tempname project_db
+	frame create `project_db'
+	frame `project_db':	project_dolink , linktype(3) linkfile("`relies_on'")	
 
 end
 
@@ -1782,41 +1699,16 @@ be a new Stata dataset created by a -save- statement but it is also for any
 file created by the project, e.g. -outsheet-, -outfile-, -graph-,
 -estimates save-...
 
-The default is to not to preserve the use data while this program performs its
-functions. The -preserve- option can be used to overide the default behavior.
-
-
 --------------------------------------------------------------------------------
 */
 
 	syntax , creates(string) [preserve]
 	
-	if ("`preserve'"!="") {
-		di as text "project: 'preserve' option is no longer necessary in build directives"
-	}	
-	
-	qui{
-	
-		* Save current frame as a local called "main_frame"
-		pwf
-		local main_frame `r(currentframe)'
+	if ("`preserve'"!="") di as text "project: 'preserve' option is no longer necessary in build directives"
 		
-		* Switch to temp frame 
-		cap: frame drop project_dev_frame
-		frame create project_dev_frame 
-		frame change project_dev_frame 
-
-	}
-	
-	project_dolink , linktype(4) linkfile("`creates'")
-	
-	
-	* Go back to starting frame and delete temp frame 
-	qui{
-		frame change `main_frame'
-		frame drop project_dev_frame
-	}
-
+	tempname project_db
+	frame create `project_db'
+	frame `project_db':	project_dolink , linktype(4) linkfile("`creates'")
 	
 end
 
