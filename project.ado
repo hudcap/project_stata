@@ -1622,7 +1622,7 @@ all upstream do-file) be rerun.
 		
 	tempname project_db
 	frame create `project_db'
-	frame `project_db':	project_dolink , linktype(1) linkfile("`original'")
+	frame `project_db': project_dolink , linktype(1) linkfile("`original'")
 			
 end
 
@@ -1651,7 +1651,7 @@ created by a previously run do-file.
 		
 	tempname project_db
 	frame create `project_db'
-	frame `project_db':	project_dolink , linktype(2) linkfile("`uses'")
+	frame `project_db': project_dolink , linktype(2) linkfile("`uses'")
 		
 end
 
@@ -1684,7 +1684,7 @@ instead of moving them to an archive.
 		
 	tempname project_db
 	frame create `project_db'
-	frame `project_db':	project_dolink , linktype(3) linkfile("`relies_on'")	
+	frame `project_db': project_dolink , linktype(3) linkfile("`relies_on'")	
 
 end
 
@@ -1708,7 +1708,7 @@ file created by the project, e.g. -outsheet-, -outfile-, -graph-,
 		
 	tempname project_db
 	frame create `project_db'
-	frame `project_db':	project_dolink , linktype(4) linkfile("`creates'")
+	frame `project_db': project_dolink , linktype(4) linkfile("`creates'")
 	
 end
 
