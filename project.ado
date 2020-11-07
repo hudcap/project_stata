@@ -273,16 +273,7 @@ Look for the database of projects along the adopath.
 		
 	}
 	
-	cap confirm string variable pname path plog relax
-	local myrc = _rc
-	
-	cap isid pname, sort
-	if _rc | `myrc' {
-		dis as err "Sorry but the database of projects appears corrupted."
-		dis as err `"Please delete "`projects'" manually and"'
-		dis as err "a new one will be created on the next run."
-		exit _rc
-	}
+	validate_database_of_projects
 
 end
 
@@ -296,7 +287,30 @@ The database of projects is saved in the Stata PERSONAL directory.
 --------------------------------------------------------------------------------
 */
 
+	validate_database_of_projects
 	
+	local projects `c(sysdir_personal)'project.dta
+	
+	cap saveold "`projects'", replace
+	if _rc {
+		dis as err "Could not save the database of projects"
+		exit _rc
+	}
+	
+
+end
+
+
+program define validate_database_of_projects
+/*
+--------------------------------------------------------------------------------
+
+Perform validation checks on the database of projects, throw an error if
+issues are detected.
+
+--------------------------------------------------------------------------------
+*/
+
 	cap confirm string variable pname path plog relax
 	local myrc = _rc
 	
@@ -307,15 +321,6 @@ The database of projects is saved in the Stata PERSONAL directory.
 		dis as err "a new one will be created on the next run."
 		exit _rc			
 	}
-	
-	local projects `c(sysdir_personal)'project.dta
-	
-	cap saveold "`projects'", replace
-	if _rc {
-		dis as err "Could not save the database of projects"
-		exit _rc
-	}
-	
 
 end
 
