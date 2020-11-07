@@ -1,4 +1,5 @@
-*! version 2.0.0b4  09jul2018  Robert Picard, picard@netbox.com
+*! version 3.0.0b1  06nov2020  Robert Picard, picard@netbox.com
+*! minor edits by Michael Stepner, software@michaelstepner.com
 program define project
 /*
 --------------------------------------------------------------------------------
@@ -170,11 +171,8 @@ Separate a file name from its path name. Return the full path name.
 	// never allow temporary files
 	tempfile f
 	local tempdir : subinstr local f "\" "/", all
-	local tempdir = regexr("`tempdir'","[^/]*$","")	
-	local fcheck : subinstr local fn "`tempdir'" ""
-	local len1 : length local fcheck
-	local len2 : length local fn
-	if `len1' != `len2' {
+	local tempdir = regexr("`tempdir'","[^/]*$","")
+	if (regexm(`"`fn'"',"^`tempdir'")==1) {
 		dis as err `"Temporary file not allowed: "`fn'""'
 		exit 198
 	}
@@ -275,16 +273,7 @@ Look for the database of projects along the adopath.
 		
 	}
 	
-	cap confirm string variable pname path plog relax
-	local myrc = _rc
-		
-	cap isid pname, sort
-	if _rc | `myrc' {
-		dis as err "Sorry but the database of projects appears corrupted."
-		dis as err `"Please delete "`projects'" manually and"'
-		dis as err "a new one will be created on the next run."
-		exit _rc
-	}
+	validate_database_of_projects
 
 end
 
@@ -293,23 +282,12 @@ program define save_database_of_projects
 /*
 --------------------------------------------------------------------------------
 
-The database of projects is saved in the same directory that this ado file
-is located. 
+The database of projects is saved in the Stata PERSONAL directory.
 
 --------------------------------------------------------------------------------
 */
 
-	
-	cap confirm string variable pname path plog relax
-	local myrc = _rc
-		
-	cap isid pname, sort
-	if _rc | `myrc' {
-		dis as err "The database of projects appears corrupted."
-		dis as err `"Please delete "`projects'" manually and"'
-		dis as err "a new one will be created on the next run."
-		exit _rc			
-	}
+	validate_database_of_projects
 	
 	local projects `c(sysdir_personal)'project.dta
 	
@@ -319,6 +297,30 @@ is located.
 		exit _rc
 	}
 	
+
+end
+
+
+program define validate_database_of_projects
+/*
+--------------------------------------------------------------------------------
+
+Perform validation checks on the database of projects, throw an error if
+issues are detected.
+
+--------------------------------------------------------------------------------
+*/
+
+	cap confirm string variable pname path plog relax
+	local myrc = _rc
+	
+	cap isid pname, sort
+	if _rc | `myrc' {
+		dis as err "The database of projects appears corrupted."
+		dis as err `"Please delete "`projects'" manually and"'
+		dis as err "a new one will be created on the next run."
+		exit _rc			
+	}
 
 end
 
