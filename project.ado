@@ -1,4 +1,4 @@
-*! version 3.0.0b1  06nov2020  Robert Picard, picard@netbox.com
+*! version 3.0.0b2  07nov2020  Robert Picard, picard@netbox.com
 *! minor edits by Michael Stepner, software@michaelstepner.com
 program define project
 /*
@@ -1751,6 +1751,12 @@ functions. The -preserve- option can be used to overide the default behavior.
 		cap estimates store `hold'
 	}
 	preserve
+	
+	// if linking to a created dta file, strip timestamp for binary stability
+	capture dtaversion "`creates'"
+	if _rc==0 {
+		if (`r(version)'==118) _strip_dta_timestamp using "`creates'"
+	}
 	
 	project_dolink , linktype(4) linkfile("`creates'")
 	
