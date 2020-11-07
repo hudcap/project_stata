@@ -1742,7 +1742,8 @@ functions. The -preserve- option can be used to overide the default behavior.
 --------------------------------------------------------------------------------
 */
 
-	syntax , creates(string) [preserve]	
+	syntax , creates(string) [preserve]
+	
 	// restore to nothing if error/Break unless user wants its data back
 	if "`preserve'" == "" clear
 	else {
@@ -1753,21 +1754,10 @@ functions. The -preserve- option can be used to overide the default behavior.
 	
 	project_dolink , linktype(4) linkfile("`creates'")
 	
-	** If file path given ends in .dta, strip timestamp (et. al.)
-	if substr("`creates'", -4, 4) == ".dta" {
-		_strip_nonreproducibility_dta `creates'
-	}
-	** If file path has no extension, strip timestamp (et. al.)
-	capture confirm file "`creates'"
-	if _rc !=0 {
-		capture confirm file "`creates'.dta"
-		if _rc == 0 {
-			_strip_nonreproducibility_dta `creates'.dta
-		}
-		else {
-		** This is an error case.  We could add in more handling, but for now it will assert 0 to force exit
-		assert 0
-		}
+	// if linking to a created dta file, strip timestamp for binary stability
+	capture dtaversion "`creates'"
+	if _rc==0 {
+		if (`r(version)'==118) _strip_dta_timestamp using "`creates'"
 	}
 	
 	if "`preserve'" != "" cap estimates restore `hold'
