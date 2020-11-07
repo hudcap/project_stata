@@ -275,7 +275,7 @@ Look for the database of projects along the adopath.
 	
 	cap confirm string variable pname path plog relax
 	local myrc = _rc
-		
+	
 	cap isid pname, sort
 	if _rc | `myrc' {
 		dis as err "Sorry but the database of projects appears corrupted."
@@ -291,8 +291,7 @@ program define save_database_of_projects
 /*
 --------------------------------------------------------------------------------
 
-The database of projects is saved in the same directory that this ado file
-is located. 
+The database of projects is saved in the Stata PERSONAL directory.
 
 --------------------------------------------------------------------------------
 */
@@ -300,7 +299,7 @@ is located.
 	
 	cap confirm string variable pname path plog relax
 	local myrc = _rc
-		
+	
 	cap isid pname, sort
 	if _rc | `myrc' {
 		dis as err "The database of projects appears corrupted."
@@ -309,8 +308,7 @@ is located.
 		exit _rc			
 	}
 	
-	qui findfile "project.ado"
-	local projects = regexr("`r(fn)'", "project.ado$", "project.dta")
+	local projects `c(sysdir_personal)'project.dta
 	
 	cap saveold "`projects'", replace
 	if _rc {
