@@ -1,0 +1,5 @@
+v 3
+d -project- fork development repository
+d original project command by Robert Picard (picard@netbox.com)
+d tweaks by Michael Stepner (software@michaelstepner.com)
+p project Stata module providing a set of tools to build and manage a Stata project
