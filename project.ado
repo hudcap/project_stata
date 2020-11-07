@@ -1752,13 +1752,13 @@ functions. The -preserve- option can be used to overide the default behavior.
 	}
 	preserve
 	
-	project_dolink , linktype(4) linkfile("`creates'")
-	
 	// if linking to a created dta file, strip timestamp for binary stability
 	capture dtaversion "`creates'"
 	if _rc==0 {
 		if (`r(version)'==118) _strip_dta_timestamp using "`creates'"
 	}
+	
+	project_dolink , linktype(4) linkfile("`creates'")
 	
 	if "`preserve'" != "" cap estimates restore `hold'
 	
