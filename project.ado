@@ -1,4 +1,4 @@
-*! version 3.0.0b2  07nov2020  Robert Picard, picard@netbox.com
+*! version 3.0.0b3  22nov2020  Robert Picard, picard@netbox.com
 *! minor edits by Michael Stepner, software@michaelstepner.com
 program define project
 /*
@@ -744,7 +744,7 @@ Build a project.
 	clear
 	char _dta[pname] "`pname'"
 	char _dta[pdir] "`pdir'"
-	local d = date("`bdate'","dmy")
+	local d = date("`bdate'","DMY")
 	char _dta[date] `d'
 	char _dta[time] `btime'
 	char _dta[plog] "`plog'"
@@ -950,7 +950,7 @@ This can only be done if the previous build was successful.
 	clear
 	char _dta[pname] "`pname'"
 	char _dta[pdir] "`pdir'"
-	local d = date("`bdate'","dmy")
+	local d = date("`bdate'","DMY")
 	char _dta[date] `d'
 	char _dta[time] `btime'
 	char _dta[plog] "`plog'"
@@ -1150,7 +1150,7 @@ This can only be done if the previous build was successful.
 	if "`smcllog'" != "" local logext "smcl"
 
 	// prepare a report
-	local d : dis %dCYND date("`bdate'","dmy")
+	local d : dis %dCYND date("`bdate'","DMY")
 	local t = subinstr("`btime'",":","",.)
 	local logfile "replication_report_`d'_`t'.`logext'"
 	capture mkdir "`repdir'"
@@ -1409,7 +1409,7 @@ Run a do-file from within a build.  The master do-file is called from
 				}
 				else {
 				
-					local d = date("`c(current_date)'","dmy")
+					local d = date("`c(current_date)'","DMY")
 					local t "`c(current_time)'"
 					if (r(fsize) <= `relax' * 1000000) {
 						// checksum #1
@@ -1836,7 +1836,7 @@ project_creates. The calling programs handle -preserve-
 			scalar `flen' = r(filelen)
 			scalar `cvs'  = r(version)
 		}
-		local d = date("`c(current_date)'","dmy")
+		local d = date("`c(current_date)'","DMY")
 		local t "`c(current_time)'"
 		if csum[`nobs'] != `csum' | ///
 		   flen[`nobs'] != `flen' | ///
@@ -2150,7 +2150,7 @@ manually changed or if there is a bug in this program.
 		exit 459
 	}	
 	
-	local start_date = date("`: char _dta[start_date]'","dmy")
+	local start_date = date("`: char _dta[start_date]'","DMY")
 	if mi(`start_date') {
 		dis as err  "Bad or missing build start date in `plinks'"
 		exit 459
@@ -2188,7 +2188,7 @@ manually changed or if there is a bug in this program.
 	}
 	
 	
-	local test = date("`: char _dta[end_date]'","dmy")
+	local test = date("`: char _dta[end_date]'","DMY")
 	if mi(`test') local build_ok 0
 
 	
@@ -2297,7 +2297,7 @@ none of the files have changed, then the build is validated.
 	// prepare date and time stamp
 	local cdate "`c(current_date)'" 
 	local ctime "`c(current_time)'"
-	local d : dis %dCYND date("`cdate'","dmy")
+	local d : dis %dCYND date("`cdate'","DMY")
 	local t = subinstr("`ctime'",":","",.)
 	local datetime "`d'_`t'"
 	
@@ -2477,7 +2477,7 @@ changed since the last time the archive task was run.
 	// prepare date and time stamp
 	local cdate "`c(current_date)'" 
 	local ctime "`c(current_time)'"
-	local d : dis %dCYND date("`cdate'","dmy")
+	local d : dis %dCYND date("`cdate'","DMY")
 	local t = subinstr("`ctime'",":","",.)
 	local datetime "`d'_`t'"
 	
@@ -2700,7 +2700,7 @@ the build could be skipped the next time around.
 	// prepare date and time stamp
 	local cdate "`c(current_date)'" 
 	local ctime "`c(current_time)'"
-	local d : dis %dCYND date("`cdate'","dmy")
+	local d : dis %dCYND date("`cdate'","DMY")
 	local t = subinstr("`ctime'",":","",.)
 	local datetime "`d'_`t'"
 	
@@ -2744,7 +2744,7 @@ the build could be skipped the next time around.
 	local sharedate : char _dta[share_`sharewith'_date]
 	local sharetime : char _dta[share_`sharewith'_time]
 	
-	local nsharedate = date("`sharedate'","dmy")
+	local nsharedate = date("`sharedate'","DMY")
 	if mi(`nsharedate') | "`alltime'" != "" local nsharedate 0
 	
 	
@@ -2924,7 +2924,7 @@ recursively and archives files that are not linked to the project.
 	// prepare date and time stamp
 	local cdate "`c(current_date)'" 
 	local ctime "`c(current_time)'"
-	local d : dis %dCYND date("`cdate'","dmy")
+	local d : dis %dCYND date("`cdate'","DMY")
 	local t = subinstr("`ctime'",":","",.)
 	local datetime "`d'_`t'"
 	
@@ -3178,7 +3178,7 @@ This program removes all files created by the project in the previous build.
 	// prepare date and time stamp
 	local cdate "`c(current_date)'" 
 	local ctime "`c(current_time)'"
-	local d : dis %dCYND date("`cdate'","dmy")
+	local d : dis %dCYND date("`cdate'","DMY")
 	local t = subinstr("`ctime'",":","",.)
 	local datetime "`d'_`t'"
 	
@@ -3322,7 +3322,7 @@ List project files in various ways
 		// include date and time stamp in log file name
 		local cdate "`c(current_date)'" 
 		local ctime "`c(current_time)'"
-		local d : dis %dCYND date("`cdate'","dmy")
+		local d : dis %dCYND date("`cdate'","DMY")
 		local t = subinstr("`ctime'",":","",.)
 		local logfile "`w'_`d'_`t'.`logext'"
 		log using "`listdir'/`logfile'", name(list_log)
