@@ -1,4 +1,4 @@
-*! version 3.0.0b3  22nov2020  Robert Picard, picard@netbox.com
+*! version 3.0.0b4  4dec2020  Robert Picard, picard@netbox.com
 *! minor edits by Michael Stepner, software@michaelstepner.com
 program define project
 /*
@@ -289,6 +289,7 @@ The database of projects is saved in the Stata PERSONAL directory.
 
 	validate_database_of_projects
 	
+	cap mkdir "`c(sysdir_personal)'"
 	local projects `c(sysdir_personal)'project.dta
 	
 	cap saveold "`projects'", replace
