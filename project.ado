@@ -40,9 +40,9 @@ reroutes each call to the appropriate local program.
 			TEXTlog             /// log file in plain text format
 			SMCLlog             /// log file in SMCL format
 			relax(string)		/// relax dependency checks for files over (in MB)
-			original			/// specify uses() file is original to this project
-			derived				/// specify uses() file is created by this project
-			documentation		/// specify uses() file is documentation relied upon
+			raw					/// enforce uses() file is original to this project
+			derived				/// enforce uses() file is created by this project
+			reference			/// specify uses() file is referenced by this project
 								/// ----- deprecated build directives ---------
 			original(string)	/// do-file uses a file not created within the project
 			relies_on(string)	/// a related file not directly used (info, docs, etc.)
@@ -691,7 +691,7 @@ Build a project.
 		gen long fdo = .		// fno of do-file
 		gen long odo = .		// fno of do-file that originated the link
 		gen long flink = .		// fno of the linked to file 
-		gen byte linktype = .	// 1 uses_original 2 uses_derived 3 uses_documentation 4 creates 5 uses
+		gen byte linktype = .	// 1 uses_raw 2 uses_derived 3 uses_reference 4 creates 5 uses
 		gen long lkcsum = .		// linked file's checksum (from -checksum-)
 		gen double lkflen = .	// linded file's length (from -checksum-)
 		gen lkcvs = .			// -checksum- version
@@ -700,7 +700,7 @@ Build a project.
 		gen byte level = .		// nested do-file level
 		
 		// there are 5 types of links
-		label def linktype_l 1 original 2 derived 3 documentation 4 creates 5 uses
+		label def linktype_l 1 raw 2 derived 3 reference 4 creates 5 uses
 		label values linktype linktype_l
 		
 		// label and numeric to string conversion for our printing routines
@@ -1537,7 +1537,7 @@ Run a do-file from within a build.  The master do-file is called from
 				dis as text "`prompt'" ///
 					as err  "skipped do-file (or nested do-file within) uses"
 				dis as text "`prompt'" ///
-					as err  "a file specified as original or documentation but " ///
+					as err  "a file specified as raw or reference but " ///
 							"that linked file is already created by the project"
 				exit 119
 			}
@@ -1623,7 +1623,7 @@ all upstream do-file) be rerun.
 
 	syntax , original(string) [preserve]
 	
-	project_uses, uses("`original'") `preserve' original
+	project_uses, uses("`original'") `preserve' raw
 			
 end
 
@@ -1652,7 +1652,7 @@ instead of moving them to an archive.
 
 	syntax , relies_on(string) [preserve]
 	
-	project_uses, uses("`relies_on'") `preserve' documentation
+	project_uses, uses("`relies_on'") `preserve' reference
 
 end
 
@@ -1675,11 +1675,11 @@ created by a previously run do-file.
 --------------------------------------------------------------------------------
 */
 
-	syntax , uses(string) [preserve original derived documentation]
+	syntax , uses(string) [preserve raw derived reference]
 	
 	if ("`preserve'"!="") di as text "project > {bf:preserve} option is no longer necessary in build directives"
 	
-	local option_list original derived documentation
+	local option_list raw derived reference
 	
 	local nopt 0
 	foreach opt in `option_list' {
@@ -1697,8 +1697,8 @@ created by a previously run do-file.
 	tempname project_db
 	frame create `project_db'
 	
-	if ("`original'"!="") frame `project_db': project_dolink , linktype(1) linkfile("`uses'")
-	else if ("`documentation'"!="") frame `project_db': project_dolink , linktype(3) linkfile("`uses'")
+	if ("`raw'"!="") frame `project_db': project_dolink , linktype(1) linkfile("`uses'")
+	else if ("`reference'"!="") frame `project_db': project_dolink , linktype(3) linkfile("`uses'")
 	else if ("`derived'"!="") frame `project_db': project_dolink , linktype(2) linkfile("`uses'")
 	else frame `project_db': project_dolink , linktype(5) linkfile("`uses'")  // unspecified
 		
@@ -1745,11 +1745,11 @@ the use of -preserve- or frames to avoid overwriting data.
 
 There are 5 potential values for linktype:
 
-	1 = uses original
+	1 = uses raw
 	2 = uses derived
-	3 = uses documentation
+	3 = uses reference
 	4 = creates
-	5 = uses [could be original, derived or documentation]
+	5 = uses [could be raw, derived or reference]
 
 --------------------------------------------------------------------------------
 */
@@ -1901,7 +1901,7 @@ There are 5 potential values for linktype:
 			qui count if flink == `flink' & linktype == 4
 			if r(N) {	
 				dis as text "`prompt'" ///
-					as err  "documentation or original file is " ///
+					as err  "raw file or reference is " ///
 							"created by the project;"
 				dis as text "`prompt'" ///
 					as err `"instead try: {bf:project , uses() derived}"'
@@ -1920,8 +1920,8 @@ There are 5 potential values for linktype:
 				dis as text "`prompt'" ///
 					as err  "file is not created by the project;"
 				dis as text "`prompt'" ///
-					as err  `"instead try: {bf:project , uses() original}"'
-					as err  `"     or try: {bf:project , uses() documentation}"'
+					as err  `"instead try: {bf:project , uses() raw}"'
+					as err  `"     or try: {bf:project , uses() reference}"'
 				exit 119
 			}
 		}
@@ -1973,7 +1973,7 @@ There are 5 potential values for linktype:
 		
 
 	// Display link info
-	local linktype : word `linktype' of uses_original uses_derived uses_documentation creates uses
+	local linktype : word `linktype' of uses_raw uses_derived uses_reference creates uses
 	local linktype : subinstr local linktype "_" " "
 	local scsum `: dis %12.0f `csum''
 	local sflen `: dis %17.0f `flen''
@@ -3520,8 +3520,8 @@ created.
 	
 	local title1 Do-Files
 	local title2 Log Files
-	local title3 Original Files used (except do-files)
-	local title4 Documentation Files relied upon
+	local title3 Raw Files used (except do-files)
+	local title4 Reference Files relied upon
 	local title5 Files created (except log files)
 	
 
