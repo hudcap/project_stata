@@ -566,27 +566,25 @@ Change Stata's current working directory to the project's directory
 
 --------------------------------------------------------------------------------
 */
-
-	// this is not a build directive
-	exit_if_in_a_build
 	
 	syntax name(name=pname id="Project Name"), cd
 	
+	tempname project_db
+	frame create `project_db'
+	frame `project_db' {
 	
-	preserve
-	
-	
-	get_database_of_projects
+		get_database_of_projects
 
-
-	qui keep if pname == "`pname'"
-	if _N == 0 {
-		dis as err `"project "`pname'" not found"'
-		exit 459
-	}
-	else {
-		cd "`=path'"
-		return local pwd "`=path'"
+		qui keep if pname == "`pname'"
+		if _N == 0 {
+			dis as err `"project "`pname'" not found"'
+			exit 459
+		}
+		else {
+			cd "`=path'"
+			return local pwd "`=path'"
+		}
+		
 	}
 	
 end
