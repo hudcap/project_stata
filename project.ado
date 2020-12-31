@@ -1677,7 +1677,7 @@ created by a previously run do-file.
 
 	syntax , uses(string) [preserve original derived documentation]
 	
-	if ("`preserve'"!="") di as text "project > {textbf:preserve} option is no longer necessary in build directives"
+	if ("`preserve'"!="") di as text "project > {bf:preserve} option is no longer necessary in build directives"
 	
 	local option_list original derived documentation
 	
@@ -1690,7 +1690,7 @@ created by a previously run do-file.
 	}
 	
 	if `nopt' > 1 {
-		dis as err "options {textbf:`option_list'} cannot be combined"
+		dis as err "options {bf:`option_list'} cannot be combined"
 		exit 198
 	}
 	
@@ -1720,7 +1720,7 @@ file created by the project, e.g. -outsheet-, -outfile-, -graph-,
 
 	syntax , creates(string) [preserve]
 	
-	if ("`preserve'"!="") di as text "project > {textbf:preserve} option is no longer necessary in build directives"
+	if ("`preserve'"!="") di as text "project > {bf:preserve} option is no longer necessary in build directives"
 	
 	// if linking to a created dta file, strip timestamp for binary stability
 	capture dtaversion "`creates'"
@@ -1904,7 +1904,7 @@ There are 5 potential values for linktype:
 					as err  "documentation or original file is " ///
 							"created by the project;"
 				dis as text "`prompt'" ///
-					as err `"instead try: {textbf:project , uses() derived}"'
+					as err `"instead try: {bf:project , uses() derived}"'
 				exit 119
 			}
 		}
@@ -1920,8 +1920,8 @@ There are 5 potential values for linktype:
 				dis as text "`prompt'" ///
 					as err  "file is not created by the project;"
 				dis as text "`prompt'" ///
-					as err  `"instead try: {textbf:project , uses() original}"'
-					as err  `"     or try: {textbf:project , uses() documentation}"'
+					as err  `"instead try: {bf:project , uses() original}"'
+					as err  `"     or try: {bf:project , uses() documentation}"'
 				exit 119
 			}
 		}
