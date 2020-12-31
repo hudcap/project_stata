@@ -1,4 +1,4 @@
-*! version 3.0.0b5  30dec2020  Robert Picard, picard@netbox.com
+*! version 3.0.0b5  31dec2020  Robert Picard, picard@netbox.com
 *! minor edits by Michael Stepner, software@michaelstepner.com
 program define project
 /*
@@ -1240,40 +1240,74 @@ Run a do-file from within a build.  The master do-file is called from
 
 	syntax , do(string) [preserve TEXTlog SMCLlog]
 	
-	// This is a build directive; check that we are currently running one
+	// Parse do-file
+	qui get_pathname "`do'"
+	local dofile "`r(fname)'"
+	local fullpath "`r(fullpath)'"
+	
+	// This is a build directive; check whether we are currently running one
 	cap describe using `"$PROJECT_buildtemp"'
 	if _rc {
-		dis as err "no project being built"
-		exit 198
+		dis as text "no project being built -> naively running do-file"
+
+		// Move to the do-file's directory
+		local savepwd "`c(pwd)'"
+		qui cd "`fullpath'"
+		
+		// Start the do-file with a clean slate
+		clear_globals
+		clear
+		mata: mata clear
+		timer clear
+		program drop _all
+		
+		if `c(stata_version)' >= 14 {
+			set rng default
+			set seed_mt64 123456789
+			set seed_kiss32 123456789
+		} 
+		else set seed 123456789
+		
+		// run the do-file; close the do-file if a break/error occured
+		version `c(stata_version)': noisily do "`dofile'"
+				
+		// restore the enclosing do-file's working directory
+		qui cd "`savepwd'"
+		
+		exit
+		
 	}
 	
 	// restore to nothing if error/Break unless user wants its data back
 	if "`preserve'" == "" clear
 	preserve
 
+	// load locals from project build database
+	tempname project_db
+	frame create `project_db'
+	frame `project_db' {
 
-	use `"$PROJECT_buildtemp"', clear
-	local pname  : char _dta[pname]
-	local pdir   : char _dta[pdir]
-	local bdate  : char _dta[date]
-	local btime  : char _dta[time]
-	local plog   : char _dta[plog]
-	local relax  : char _dta[relax]
-	
-	if "`pname'" == "" | "`pdir'" == "" | "`bdate'" == "" | "`btime'" == "" | "`plog'" == ""  | "`relax'" == "" {
-		dis as err "build parameters corrupted - this should never happen"
-		exit 459
+		use `"$PROJECT_buildtemp"', clear
+		local pname  : char _dta[pname]
+		local pdir   : char _dta[pdir]
+		local bdate  : char _dta[date]
+		local btime  : char _dta[time]
+		local plog   : char _dta[plog]
+		local relax  : char _dta[relax]
+		
+		if "`pname'" == "" | "`pdir'" == "" | "`bdate'" == "" | "`btime'" == "" | "`plog'" == ""  | "`relax'" == "" {
+			dis as err "build parameters corrupted - this should never happen"
+			exit 459
+		}
+		
+		local pfiles "`pdir'/`pname'_files.dta"
+		local plinks "`pdir'/`pname'_links.dta"
+		local prompt "project `pname' > "
+
 	}
-	
-	local pfiles "`pdir'/`pname'_files.dta"
-	local plinks "`pdir'/`pname'_links.dta"
-	local prompt "project `pname' > "	
-
+	frame drop `project_db'
 
 	// Force the user to run do-files from within the project directory
-	qui get_pathname "`do'"
-	local dofile "`r(fname)'"
-	local fullpath "`r(fullpath)'"
 	if "`pdir'" == "`fullpath'" local dopath ""
 	else local dopath : subinstr local fullpath "`pdir'/" ""
 	local len_full : length local fullpath
@@ -1301,73 +1335,88 @@ Run a do-file from within a build.  The master do-file is called from
 	local logfile = "`dofstub'.`logext'"
 	
 	
-	// Find the do-file in the project files database. If the do-file is not
-	// yet in the database, use the next available number; that's the number
-	// that will be assigned by the dolink call just before running the do-file
-	// for the first time
-	qui use "`pfiles'", clear
-	gen n = _n
-	sum n if upper(fname) == upper("`dofile'") & ///
-			upper(fpath) == upper("`dopath'"), meanonly
-	if r(N) == 0 {
-		sum fno, meanonly
-		local fdo = cond(mi(r(max)), 1, r(max) + 1)
+	tempname project_files
+	frame create `project_files'
+	frame `project_files' {
+		// Find the do-file in the project files database. If the do-file is not
+		// yet in the database, use the next available number; that's the number
+		// that will be assigned by the dolink call just before running the do-file
+		// for the first time
+		qui use "`pfiles'", clear
+		gen n = _n
+		sum n if upper(fname) == upper("`dofile'") & ///
+				upper(fpath) == upper("`dopath'"), meanonly
+		if r(N) == 0 {
+			sum fno, meanonly
+			local fdo = cond(mi(r(max)), 1, r(max) + 1)
+		}
+		else {
+			local fdo = fno[r(max)]
+		}
+		
+		
+		// Find the file number of the logfile if it exists
+		sum n if upper(fname) == upper("`logfile'") & ///
+				upper(fpath) == upper("`dopath'"), meanonly
+		local flog = fno[r(max)]
 	}
-	else {
-		local fdo = fno[r(max)]
-	}
-	
-	
-	// Find the file number of the logfile if it exists
-	sum n if upper(fname) == upper("`logfile'") & ///
-			upper(fpath) == upper("`dopath'"), meanonly
-	local flog = fno[r(max)]
+	frame drop `project_files'
 
 
 	// Add the do-file to the list of currently active do-files.
 	// Get the file number of the enclosing do-file, missing if this is the master
-	qui use `"$PROJECT_buildtemp"', clear
-	local dolist : char _dta[dolist]
-	gettoken enclosing_do : dolist
-	char _dta[dolist]  `fdo' `dolist'
-	qui save `"$PROJECT_buildtemp"', replace emptyok
-	
-
-	// Do not run the same do-file more than once.
-	qui use "`plinks'", clear
-	capture count if fdo == `fdo' & newlink
-	if r(N) {
-		dis as text "`prompt'" ///
-			as err `"Cannot do "`dofile'" more than once per build"'
-		exit 119
+	tempname project_db
+	frame create `project_db'
+	frame `project_db' {
+		qui use `"$PROJECT_buildtemp"', clear
+		local dolist : char _dta[dolist]
+		gettoken enclosing_do : dolist
+		char _dta[dolist]  `fdo' `dolist'
+		qui save `"$PROJECT_buildtemp"', replace emptyok
 	}
+	frame drop `project_db'
 
-	
-	// Another do-file should not be linked to this one
-	qui count if flink == `fdo' & newlink
-	if r(N) {
-		dis as text "`prompt'" ///
-			as err `"Another do-file is linked to "`dofile'""'
-		exit 119
+	tempname project_links
+	frame create `project_links'
+	frame `project_links' {
+
+		// Do not run the same do-file more than once.
+		qui use "`plinks'", clear
+		capture count if fdo == `fdo' & newlink
+		if r(N) {
+			dis as text "`prompt'" ///
+				as err `"Cannot do "`dofile'" more than once per build"'
+			exit 119
+		}
+
+		
+		// Another do-file should not be linked to this one
+		qui count if flink == `fdo' & newlink
+		if r(N) {
+			dis as text "`prompt'" ///
+				as err `"Another do-file is linked to "`dofile'""'
+			exit 119
+		}
+		
+		
+		// If this do-file successfully completed its previous run, it will have a
+		// link to its logfile. If that's the case, we may not have to run it again.
+		// Save copies of its previous links so that we may check.
+		qui keep if fdo == `fdo'
+		qui count if flink == `flog'
+		local do_it = r(N) == 0
+		if !`do_it' {
+			tempfile dolinks
+			qui save "`dolinks'"
+		}
+
+		// Clear the links from the previous build
+		qui use "`plinks'", clear
+		qui drop if fdo == `fdo'
+		qui save "`plinks'", replace emptyok
 	}
-	
-	
-	// If this do-file successfully completed its previous run, it will have a
-	// link to its logfile. If that's the case, we may not have to run it again.
-	// Save copies of its previous links so that we may check.
-	qui keep if fdo == `fdo'
-	qui count if flink == `flog'
-	local do_it = r(N) == 0
-	if !`do_it' {
-		tempfile dolinks
-		qui save "`dolinks'"
-	}
+	frame drop `project_links'
 
-
-	// Clear the links from the previous build
-	qui use "`plinks'", clear
-	qui drop if fdo == `fdo'
-	qui save "`plinks'", replace emptyok
 		
 	
 	if !`do_it' {
