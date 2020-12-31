@@ -1807,7 +1807,7 @@ There are 5 potential values for linktype:
 	// This is a build directive; check that we are currently running one
 	cap describe using `"$PROJECT_buildtemp"'
 	if _rc {
-		dis "no project being built -> build directive ignored"
+		dis "project > no build running, build directive ignored"
 		exit
 	}
 	
