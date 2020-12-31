@@ -1,4 +1,4 @@
-*! version 3.0.0b4  4dec2020  Robert Picard, picard@netbox.com
+*! version 3.0.0b5  30dec2020  Robert Picard, picard@netbox.com
 *! minor edits by Michael Stepner, software@michaelstepner.com
 program define project
 /*
@@ -11,7 +11,6 @@ reroutes each call to the appropriate local program.
 */
 
 	version 16.0
-
 
 	syntax	[name(name=pname id="Project Name")], ///
 			[					///
@@ -32,9 +31,7 @@ reroutes each call to the appropriate local program.
 			rmcreated			/// erase all files created by the project
 								/// --------- build directives ----------------
 			do(string)			/// do-file to run
-			original(string)	/// do-file uses a file not created within the project
-			uses(string)		///	do-file uses a file created within the project
-			relies_on(string)	/// a related file not directly used (info, docs, etc.)
+			uses(string)		///	do-file uses a file
 			creates(string)		/// do-file creates a file
 			doinfo				/// returns info about the do-file and current build
 			break				/// to stop execution of a project at a specific point
@@ -43,12 +40,18 @@ reroutes each call to the appropriate local program.
 			TEXTlog             /// log file in plain text format
 			SMCLlog             /// log file in SMCL format
 			relax(string)		/// relax dependency checks for files over (in MB)
+			original			/// specify uses() file is original to this project
+			derived				/// specify uses() file is created by this project
+			documentation		/// specify uses() file is documentation relied upon
+								/// ----- deprecated build directives ---------
+			original(string)	/// do-file uses a file not created within the project
+			relies_on(string)	/// a related file not directly used (info, docs, etc.)
 			]
-
 
 	local command_list setup setmaster plist pclear cd ///
 		build list validate replicate archive share cleanup rmcreated ///
-		do original uses relies_on creates doinfo break
+		do uses creates doinfo break ///
+		original relies_on
 	
 	local nopt 0
 	foreach opt in `command_list' {
@@ -688,7 +691,7 @@ Build a project.
 		gen long fdo = .		// fno of do-file
 		gen long odo = .		// fno of do-file that originated the link
 		gen long flink = .		// fno of the linked to file 
-		gen byte linktype = .	// 1 original 2 uses 3 relies_on 4 creates
+		gen byte linktype = .	// 1 uses_original 2 uses_derived 3 uses_documentation 4 creates 5 uses
 		gen long lkcsum = .		// linked file's checksum (from -checksum-)
 		gen double lkflen = .	// linded file's length (from -checksum-)
 		gen lkcvs = .			// -checksum- version
@@ -696,8 +699,8 @@ Build a project.
 		gen int norder = .		// link's order of appearance within the do-file
 		gen byte level = .		// nested do-file level
 		
-		// there are 4 types of links
-		label def linktype_l 1 original 2 uses 3 relies_on 4 creates
+		// there are 5 types of links
+		label def linktype_l 1 original 2 derived 3 documentation 4 creates 5 uses
 		label values linktype linktype_l
 		
 		// label and numeric to string conversion for our printing routines
@@ -859,7 +862,7 @@ This can only be done if the previous build was successful.
 	dis as res  "`: char _dta[end_date]', `: char _dta[end_time]'" _n
 	
 
-	// The master do-file is lined to all files in the most recent build.
+	// The master do-file is linked to all files in the most recent build.
 	// The norder variable is kept to track the order in which each file
 	// was created.
 	qui keep if fdo == 1
@@ -1532,18 +1535,18 @@ Run a do-file from within a build.  The master do-file is called from
 			qui count if (linktype0 == 1 | linktype0 == 3) & linktype == 4
 			if r(N) {	
 				dis as text "`prompt'" ///
-					as err  "skipped do-file (or nested do-file within) contains"
+					as err  "skipped do-file (or nested do-file within) uses"
 				dis as text "`prompt'" ///
-					as err  "a -relies_on()- or -original() build directive but " ///
-							"linked file is already created by the project"
+					as err  "a file specified as original or documentation but " ///
+							"that linked file is already created by the project"
 				exit 119
 			}
 			qui count if linktype0 == 2 & linktype != 4
 			if r(N) {	
 				dis as text "`prompt'" ///
-					as err  "skipped do-file (or nested do-file within) contains"
+					as err  "skipped do-file (or nested do-file within) uses"
 				dis as text "`prompt'" ///
-					as err  "a -uses()- build directive but " ///
+					as err  "a file specified as derived but " ///
 					"no prior -creates()- build directive found"
 				exit 119
 			}
@@ -1620,41 +1623,8 @@ all upstream do-file) be rerun.
 
 	syntax , original(string) [preserve]
 	
-	if ("`preserve'"!="") di as text "project: 'preserve' option is no longer necessary in build directives"
-		
-	tempname project_db
-	frame create `project_db'
-	frame `project_db': project_dolink , linktype(1) linkfile("`original'")
+	project_uses, uses("`original'") `preserve' original
 			
-end
-
-
-program define project_uses
-/*
---------------------------------------------------------------------------------
-
-The uses(filename) build directive is used to link the currently running
-do-file (and all upstream do-files) to a file that was created by the 
-project. The linked file is used in some way and therefore the results of the 
-project could change (including log files) if the linked file changes.
-Therefore any change to the linked file will require that the do-file (and
-all upstream do-file) be rerun 
-
-Note that is it not necessary to declare such a link in the do-file that
-actually creates the linked file. This is typically used with files that are
-created by a previously run do-file.
-
---------------------------------------------------------------------------------
-*/
-
-	syntax , uses(string) [preserve]
-	
-	if ("`preserve'"!="") di as text "project: 'preserve' option is no longer necessary in build directives"
-		
-	tempname project_db
-	frame create `project_db'
-	frame `project_db': project_dolink , linktype(2) linkfile("`uses'")
-		
 end
 
 
@@ -1682,12 +1652,56 @@ instead of moving them to an archive.
 
 	syntax , relies_on(string) [preserve]
 	
-	if ("`preserve'"!="") di as text "project: 'preserve' option is no longer necessary in build directives"
-		
+	project_uses, uses("`relies_on'") `preserve' documentation
+
+end
+
+
+program define project_uses
+/*
+--------------------------------------------------------------------------------
+
+The uses(filename) build directive is used to link the currently running
+do-file (and all upstream do-files) to a file that was created by the 
+project. The linked file is used in some way and therefore the results of the 
+project could change (including log files) if the linked file changes.
+Therefore any change to the linked file will require that the do-file (and
+all upstream do-file) be rerun 
+
+Note that is it not necessary to declare such a link in the do-file that
+actually creates the linked file. This is typically used with files that are
+created by a previously run do-file.
+
+--------------------------------------------------------------------------------
+*/
+
+	syntax , uses(string) [preserve original derived documentation]
+	
+	if ("`preserve'"!="") di as text "project > {textbf:preserve} option is no longer necessary in build directives"
+	
+	local option_list original derived documentation
+	
+	local nopt 0
+	foreach opt in `option_list' {
+		if "``opt''" ~= "" {
+			local myopt `opt'
+			local ++nopt
+		}
+	}
+	
+	if `nopt' > 1 {
+		dis as err "options {textbf:`option_list'} cannot be combined"
+		exit 198
+	}
+	
 	tempname project_db
 	frame create `project_db'
-	frame `project_db': project_dolink , linktype(3) linkfile("`relies_on'")	
-
+	
+	if ("`original'"!="") frame `project_db': project_dolink , linktype(1) linkfile("`uses'")
+	else if ("`documentation'"!="") frame `project_db': project_dolink , linktype(3) linkfile("`uses'")
+	else if ("`derived'"!="") frame `project_db': project_dolink , linktype(2) linkfile("`uses'")
+	else frame `project_db': project_dolink , linktype(5) linkfile("`uses'")  // unspecified
+		
 end
 
 
@@ -1706,7 +1720,7 @@ file created by the project, e.g. -outsheet-, -outfile-, -graph-,
 
 	syntax , creates(string) [preserve]
 	
-	if ("`preserve'"!="") di as text "project: 'preserve' option is no longer necessary in build directives"
+	if ("`preserve'"!="") di as text "project > {textbf:preserve} option is no longer necessary in build directives"
 	
 	// if linking to a created dta file, strip timestamp for binary stability
 	capture dtaversion "`creates'"
@@ -1726,8 +1740,16 @@ program define project_dolink, rclass
 --------------------------------------------------------------------------------
 
 Link the currently running do-file to a file. This program is called from
-project_do, project_original, project_uses, project_relies_on, and
-project_creates. The calling programs handle -preserve-
+project_do, project_uses, and project_creates. The calling programs handle
+the use of -preserve- or frames to avoid overwriting data.
+
+There are 5 potential values for linktype:
+
+	1 = uses original
+	2 = uses derived
+	3 = uses documentation
+	4 = creates
+	5 = uses [could be original, derived or documentation]
 
 --------------------------------------------------------------------------------
 */
@@ -1738,8 +1760,8 @@ project_creates. The calling programs handle -preserve-
 	// This is a build directive; check that we are currently running one
 	cap describe using `"$PROJECT_buildtemp"'
 	if _rc {
-		dis as err "no project being built"
-		exit 198
+		dis "no project being built -> build directive ignored"
+		exit
 	}
 	
 	use `"$PROJECT_buildtemp"', clear
@@ -1879,10 +1901,10 @@ project_creates. The calling programs handle -preserve-
 			qui count if flink == `flink' & linktype == 4
 			if r(N) {	
 				dis as text "`prompt'" ///
-					as err  "relies_on or original file is " ///
+					as err  "documentation or original file is " ///
 							"created by the project;"
 				dis as text "`prompt'" ///
-					as err `"try: project , uses(`anything') instead."'
+					as err `"instead try: {textbf:project , uses() derived}"'
 				exit 119
 			}
 		}
@@ -1898,7 +1920,8 @@ project_creates. The calling programs handle -preserve-
 				dis as text "`prompt'" ///
 					as err  "file is not created by the project;"
 				dis as text "`prompt'" ///
-					as err  `"try: project , original(`anything') instead."'
+					as err  `"instead try: {textbf:project , uses() original}"'
+					as err  `"     or try: {textbf:project , uses() documentation}"'
 				exit 119
 			}
 		}
@@ -1950,7 +1973,7 @@ project_creates. The calling programs handle -preserve-
 		
 
 	// Display link info
-	local linktype : word `linktype' of uses_original uses relies_on creates
+	local linktype : word `linktype' of uses_original uses_derived uses_documentation creates uses
 	local linktype : subinstr local linktype "_" " "
 	local scsum `: dis %12.0f `csum''
 	local sflen `: dis %17.0f `flen''
@@ -2168,11 +2191,11 @@ manually changed or if there is a bug in this program.
 		exit 459
 	}	
 
-	// a file is created (4) before it is used (2)
+	// a file is created (4) before it is used (2 or 5)
 	sort fdo flink norder
 	capture by fdo flink: assert _n == 1 if linktype == 4
 	local myrc = _rc
-	capture by fdo flink: assert linktype == 2 if linktype[1] == 4 & _n > 1
+	capture by fdo flink: assert linktype == 2 | linktype == 5 if linktype[1] == 4 & _n > 1
 	local myrc = `myrc' + _rc
 	if `myrc' {
 		dis as err  "Inconsistent linktype"
@@ -2725,7 +2748,7 @@ the build could be skipped the next time around.
 	sort flink norder
 	qui by flink: keep if _n == 1
 	
-	// Drop files that are created by the project is requested
+	// Drop files that are created by the project if requested
 	if "`created'" == "nocreated" qui drop if linktype == 4
 	
 	// get file information for files linked to in the most recent build
@@ -3491,14 +3514,14 @@ created.
 
 	
 	// Flag other types; type "uses" is always trumped by "creates"
-	qui replace ftype  = 3 if mi(ftype) & linktype == 1
+	qui replace ftype  = 3 if mi(ftype) & (linktype == 1 | linktype == 5)
 	qui replace ftype  = 4 if linktype == 3
 	qui replace ftype  = 5 if mi(ftype) & linktype == 4
 	
 	local title1 Do-Files
 	local title2 Log Files
 	local title3 Original Files used (except do-files)
-	local title4 Original Files that are relied upon
+	local title4 Documentation Files relied upon
 	local title5 Files created (except log files)
 	
 
@@ -3759,7 +3782,7 @@ List project files alphabetically with a list of all do-files that link to them.
 	// file's name first and then the records from do-files that originated
 	// the link. Put "uses" link after the "creates" link.
 	gen dofile = fdo != .
-	gen uses = linktype == 2
+	gen uses = linktype == 2 | linktype == 5
 	sort flink dofile uses fname fpath
 	by flink: gen upfname = upper(fname[1])
 	qui by flink: gen upfpath = upper(fpath[1])
