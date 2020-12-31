@@ -1728,6 +1728,13 @@ created by a previously run do-file.
 	
 	if ("`preserve'"!="") di as text "project > {bf:preserve} option is no longer necessary in build directives"
 	
+	// This is a build directive; check whether we are currently running one
+	cap describe using `"$PROJECT_buildtemp"'
+	if _rc {
+		dis "no project being built -> build directive ignored"
+		exit
+	}
+	
 	local option_list raw derived reference
 	
 	local nopt 0
@@ -1771,6 +1778,13 @@ file created by the project, e.g. -outsheet-, -outfile-, -graph-,
 	
 	if ("`preserve'"!="") di as text "project > {bf:preserve} option is no longer necessary in build directives"
 	
+	// This is a build directive; check whether we are currently running one
+	cap describe using `"$PROJECT_buildtemp"'
+	if _rc {
+		dis "no project being built -> build directive ignored"
+		exit
+	}
+	
 	// if linking to a created dta file, strip timestamp for binary stability
 	capture dtaversion "`creates'"
 	if _rc==0 {
@@ -1804,14 +1818,6 @@ There are 5 potential values for linktype:
 */
 
 	syntax , linktype(integer) linkfile(string)
-
-
-	// This is a build directive; check that we are currently running one
-	cap describe using `"$PROJECT_buildtemp"'
-	if _rc {
-		dis "no project being built -> build directive ignored"
-		exit
-	}
 	
 	use `"$PROJECT_buildtemp"', clear
 	local pname  : char _dta[pname]
