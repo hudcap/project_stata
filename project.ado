@@ -769,7 +769,7 @@ Build a project.
 	dis as text _dup(`c(linesize)') "="
 	
 	
-	restore, not	// cancel break hanling
+	restore, not	// cancel break handling
 	
 		
 	// run the master do-file but capture any error / Break key
@@ -1992,84 +1992,79 @@ program define project_doinfo, rclass
 The doinfo build directive is used to get information about the current do-file 
 and the status of the build. 
 
-The default is to not to preserve the use data while this program performs its
-functions. The -preserve- option can be used to overide the default behavior.
-
 --------------------------------------------------------------------------------
 */
 
 	syntax , doinfo [preserve]
 	
 	
-	// This is a build directive; check that we are currently running one
+	// This is a build directive; enforce that we are currently running one
 	cap describe using `"$PROJECT_buildtemp"'
 	if _rc {
 		dis as err "no project being built"
 		exit 198
 	}
 	
-	// restore to nothing if error/Break unless user wants its data back
-	if "`preserve'" == "" clear
-	else {
-		tempname hold
-		cap estimates store `hold'
-	}
-	preserve
-
-	use `"$PROJECT_buildtemp"', clear
-	local pname  : char _dta[pname]
-	local pdir   : char _dta[pdir]
-	local dolist : char _dta[dolist]
-	local bdate  : char _dta[date]
-	local bdate  : dis %d `bdate'
-	local btime  : char _dta[time]
+	if ("`preserve'"!="") di as text "project > {bf:preserve} option is no longer necessary in build directives"
 	
-	if "`pname'" == "" | "`pdir'" == "" | "`bdate'" == "" | "`btime'" == "" {
-		dis as err "build parameters corrupted - this should never happen"
-		exit 459
-	}
-	
-	local pfiles "`pdir'/`pname'_files.dta"
-	local plinks "`pdir'/`pname'_links.dta"
-	local prompt "project `pname' > "
-
-
-	dis as txt "`prompt'Project Name: " as res "`pname'"
-	dis as txt "`prompt'Project Dir.: " as res "`pdir'"
-	dis as txt "`prompt'Build start : " ///
-		as res  "`bdate', `btime'" as text ""
+	tempname project_db
+	frame create `project_db'
+	frame `project_db' {
 		
-
-	gettoken current_do other_do : dolist
-	
-	qui use "`pfiles'", clear
-	gen n = _n
-	sum n if fno == `current_do', meanonly
-	local nobs = r(min)
-	local dofile = fname[`nobs']
-	if regexm("`dofile'","(.*)\.do$") local dofstub = regexs(1)
-	dis as txt "`prompt'Do-file Name: " as res "`dofile'"
-	
-	if !mi("`other_do'") {
-		dis as txt "`prompt'Enclosing do-files:"
-		foreach fdo of numlist `other_do' {
-			sum n if fno == `fdo', meanonly
-			local nobs = r(min)
-			local fname = fname[`nobs']
-			local fpath = fpath[`nobs']
-			dis as txt "`prompt'    " _cont
-			if !mi("`fpath'") dis as res "`fpath'/`fname'"
-			else dis as res "`fname'"
+		use `"$PROJECT_buildtemp"', clear
+		local pname  : char _dta[pname]
+		local pdir   : char _dta[pdir]
+		local dolist : char _dta[dolist]
+		local bdate  : char _dta[date]
+		local bdate  : dis %d `bdate'
+		local btime  : char _dta[time]
+		
+		if "`pname'" == "" | "`pdir'" == "" | "`bdate'" == "" | "`btime'" == "" {
+			dis as err "build parameters corrupted - this should never happen"
+			exit 459
 		}
+		
+		local pfiles "`pdir'/`pname'_files.dta"
+		local plinks "`pdir'/`pname'_links.dta"
+		local prompt "project `pname' > "
+
+
+		dis as txt "`prompt'Project Name: " as res "`pname'"
+		dis as txt "`prompt'Project Dir.: " as res "`pdir'"
+		dis as txt "`prompt'Build start : " ///
+			as res  "`bdate', `btime'" as text ""
+			
+
+		gettoken current_do other_do : dolist
+		
+		qui use "`pfiles'", clear
+		gen n = _n
+		sum n if fno == `current_do', meanonly
+		local nobs = r(min)
+		local dofile = fname[`nobs']
+		if regexm("`dofile'","(.*)\.do$") local dofstub = regexs(1)
+		dis as txt "`prompt'Do-file Name: " as res "`dofile'"
+		
+		if !mi("`other_do'") {
+			dis as txt "`prompt'Enclosing do-files:"
+			foreach fdo of numlist `other_do' {
+				sum n if fno == `fdo', meanonly
+				local nobs = r(min)
+				local fname = fname[`nobs']
+				local fpath = fpath[`nobs']
+				dis as txt "`prompt'    " _cont
+				if !mi("`fpath'") dis as res "`fpath'/`fname'"
+				else dis as res "`fname'"
+			}
+		}
+		
+		return local pname "`pname'"
+		return local pdir  "`pdir'"
+		return local bdate "`bdate'"
+		return local btime "`btime'"
+		return local dofile "`dofstub'"
+		
 	}
-	
-	return local pname "`pname'"
-	return local pdir  "`pdir'"
-	return local bdate "`bdate'"
-	return local btime "`btime'"
-	return local dofile "`dofstub'"
-	
-	if "`preserve'" != "" cap estimates restore `hold'
 
 end
 
