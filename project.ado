@@ -4217,6 +4217,27 @@ end
 
 
 version 16.0
+qui python query
+if (substr("`r(version)'",1,1)=="2") {  // python version 2.x
+
+python:
+from __future__ import absolute_import
+import re
+from io import open
+
+def strip_dta_timestamp(filename):
+
+	fileObject = open(filename,u"rb+")
+	firstLine = str(fileObject.readline())
+	updatedLine = re.sub(str("<timestamp>\x11.*?</timestamp>").encode('utf-8'),str("<timestamp>\x11 1 Jan 2020 12:00</timestamp>").encode('utf-8'), firstLine, 1, flags=0)
+	fileObject.seek(0)
+	fileObject.write(updatedLine)
+	fileObject.close()
+end
+
+}
+else {  // python version 3.x
+
 python:
 import re
 
@@ -4228,4 +4249,5 @@ def strip_dta_timestamp(filename):
 	fileObject.write(updatedLine)
 	fileObject.close()
 end
-
+	
+}
