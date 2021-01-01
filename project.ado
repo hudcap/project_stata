@@ -1,4 +1,4 @@
-*! version 3.0.0b5  31dec2020  Robert Picard, picard@netbox.com
+*! version 3.0.0b6  31dec2020  Robert Picard, picard@netbox.com
 *! minor edits by Michael Stepner, software@michaelstepner.com
 program define project
 /*
@@ -1770,10 +1770,10 @@ file created by the project, e.g. -outsheet-, -outfile-, -graph-,
 	if ("`preserve'"!="") di as text "project > {bf:preserve} option is no longer necessary in build directives"
 	
 	// if linking to a created dta file, strip timestamp for binary stability
-	capture dtaversion "`creates'"
-	if _rc==0 {
-		if (`r(version)'==118) _strip_dta_timestamp using "`creates'"
-	}
+// 	capture dtaversion "`creates'"
+// 	if _rc==0 {
+// 		if (`r(version)'==118) _strip_dta_timestamp using "`creates'"
+// 	}
 		
 	tempname project_db
 	frame create `project_db'
