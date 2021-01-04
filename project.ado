@@ -4198,7 +4198,7 @@ around -checksum- that returns the correct file size.
 	
 end
 
-
+/*
 program _strip_dta_timestamp
 	/*** Replaces the timestamp in a dta file with "1 Jan 2020 12:00".
 		 Doing so improves the binary stability of the saved dta file.
