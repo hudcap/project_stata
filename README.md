@@ -3,7 +3,7 @@
 This beta version of `project` can be installed by running the Stata command:
 
 ```
-net install project, from(https://github.com/michaelstepner/project_stata/raw/main)
+net install project, from(https://github.com/michaelstepner/project_stata/raw/relaxed-uses-build-directive)
 ```
 
 # Description
