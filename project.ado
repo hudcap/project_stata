@@ -1,4 +1,4 @@
-*! version 3.0.0b6  31dec2020  Robert Picard, picard@netbox.com
+*! version 3.0.0b7  1mar2021  Robert Picard, picard@netbox.com
 *! minor edits by Michael Stepner, software@michaelstepner.com
 program define project
 /*
@@ -20,6 +20,7 @@ reroutes each call to the appropriate local program.
 			plist				/// list of projects and their directory
 			pclear				/// clear a project's record in the dataset of projects
 			cd					/// change Stata's dir to the project directory
+			root				/// store the project directory in the $root global
 								/// --------- project management tasks --------
 			build				/// builds the project (runs the master do-file)
 			list(string)		/// list files in the project
@@ -48,7 +49,7 @@ reroutes each call to the appropriate local program.
 			relies_on(string)	/// a related file not directly used (info, docs, etc.)
 			]
 
-	local command_list setup setmaster plist pclear cd ///
+	local command_list setup setmaster plist pclear cd root ///
 		build list validate replicate archive share cleanup rmcreated ///
 		do uses creates doinfo break ///
 		original relies_on
@@ -586,6 +587,44 @@ Change Stata's current working directory to the project's directory
 		}
 		
 	}
+	
+end
+
+program define project_root, rclass
+/*
+--------------------------------------------------------------------------------
+
+Store the project directory in the $root global
+and return an indicator for whether a build is running.
+
+--------------------------------------------------------------------------------
+*/
+	
+	syntax name(name=pname id="Project Name"), root
+	
+	* Print project directory and store in $root global
+	tempname project_db
+	frame create `project_db'
+	frame `project_db' {
+	
+		get_database_of_projects
+
+		qui keep if pname == "`pname'"
+		if _N == 0 {
+			dis as err `"project "`pname'" not found"'
+			exit 459
+		}
+		else {
+			global root "`=path'"
+			di "`=path'"
+		}
+		
+	}
+	
+	* Return indicator for whether a build is running
+	cap describe using `"$PROJECT_buildtemp"'
+	if (!_rc) return scalar buildrunning=1
+	else return scalar buildrunning=0
 	
 end
 
