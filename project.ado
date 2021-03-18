@@ -1,4 +1,4 @@
-*! version 3.0.0b7  1mar2021  Robert Picard, picard@netbox.com
+*! version 3.0.0b8  18mar2021  Robert Picard, picard@netbox.com
 *! minor edits by Michael Stepner, software@michaelstepner.com
 program define project
 /*
@@ -382,6 +382,9 @@ Stata PERSONAL directory.
 		dis as err "Stata's standard {help [M-1] naming:naming convention} for variables and other objects"
 		exit 198
 	}
+	
+	// create Stata PERSONAL directory if it does not yet exist
+	if inlist("`c(os)'","MacOSX","Unix") shell mkdir -p `c(sysdir_personal)'
 
 	
 	local logtype = cond("`textlog'" == "","SMCL","plain text")
