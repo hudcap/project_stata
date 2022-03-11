@@ -4065,10 +4065,30 @@ program define clear_globals
 /*
 --------------------------------------------------------------------------------
 
-Drop all global macros without loosing local macros
+Drop all global macros without losing local macros
+Also preserves customized function keys and PAUSEON state
 
 --------------------------------------------------------------------------------
 */
+
+	local globals_to_save PAUSEON
+	forval i = 1/12 { // 12 function keys
+		local globals_to_save `globals_to_save' F`i'
+	}
+
+	foreach name in `globals_to_save' {
+		local `name': copy global `name'
+	}
+
+	clear_globals_sub
+
+	foreach name in `globals_to_save' {
+		global `name': copy local `name'
+	}
+
+end
+
+program define clear_globals_sub
 
 	macro drop _all
 
