@@ -680,7 +680,7 @@ Build a project.
 		char _dta[vlist_files] fno fname fpath relpath csum flen cvs  ///
 				cdate ctime chngdate chngtime archiveflag
 
-		qui save "`pfiles'", replace emptyok
+		qui robust_save "`pfiles'", replace emptyok
 
 
 		// create a new database of links (dependencies)
@@ -708,7 +708,7 @@ Build a project.
 		char _dta[vlist_links] fdo odo flink linktype lkcsum lkflen lkcvs ///
 			newlink norder level
 
-		qui save "`plinks'", replace emptyok
+		qui robust_save "`plinks'", replace emptyok
 
 	}
 
@@ -736,7 +736,7 @@ Build a project.
 	char _dta[start_time] "`btime'"
 	char _dta[end_date] ""
 	char _dta[end_time] ""
-	qui save "`plinks'", replace emptyok
+	qui robust_save "`plinks'", replace emptyok
 
 
 	// Create a dataset that we can find at any time and irrespective of the
@@ -753,7 +753,7 @@ Build a project.
 
 	tempfile buildtemp
 	global PROJECT_buildtemp `"`buildtemp'"'
-	qui save `"$PROJECT_buildtemp"', emptyok
+	qui robust_save `"$PROJECT_buildtemp"', emptyok
 
 	global S_ADO UPDATES;BASE;SITE;.;`"`pdir'/ado"';PERSONAL;PLUS;OLDPLACE
 
@@ -793,7 +793,7 @@ Build a project.
 	char _dta[end_date]  "`bdate'"
 	char _dta[end_time]  "`btime'"
 	sort fdo norder
-	qui save "`plinks'", replace
+	qui robust_save "`plinks'", replace
 
 
 	dis as text _dup(`c(linesize)') "="
@@ -875,7 +875,7 @@ This can only be done if the previous build was successful.
 	rename cvs cvs00
 	sort fno
 	tempfile fcreated
-	qui save "`fcreated'"
+	qui robust_save "`fcreated'"
 
 
 	// Sort files by directory (ignore case)
@@ -942,7 +942,7 @@ This can only be done if the previous build was successful.
 	char _dta[start_time]  "`btime'"
 	char _dta[end_date]  ""
 	char _dta[end_time]  ""
-	qui save "`plinks'", replace emptyok
+	qui robust_save "`plinks'", replace emptyok
 
 
 	// Create a dataset that we can find at any time and irrespective of the
@@ -959,7 +959,7 @@ This can only be done if the previous build was successful.
 
 	tempfile buildtemp
 	global PROJECT_buildtemp `"`buildtemp'"'
-	qui save `"$PROJECT_buildtemp"', emptyok
+	qui robust_save `"$PROJECT_buildtemp"', emptyok
 
 
 	global S_ADO UPDATES;BASE;SITE;.;`"`pdir'/ado"';PERSONAL;PLUS;OLDPLACE
@@ -992,7 +992,7 @@ This can only be done if the previous build was successful.
 	char _dta[end_date]  "`bdate'"
 	char _dta[end_time]  "`btime'"
 	sort fdo norder
-	qui save "`plinks'", replace
+	qui robust_save "`plinks'", replace
 
 
 	dis as text _dup(`c(linesize)') "="
@@ -1040,7 +1040,7 @@ This can only be done if the previous build was successful.
 	gen chng = 0
 	sort norder
 	tempfile flist
-	qui save "`flist'"
+	qui robust_save "`flist'"
 
 
 	local nchng 0
@@ -1082,7 +1082,7 @@ This can only be done if the previous build was successful.
 			qui drop if regexm(s0,"obs:.+[0-9]:[0-9][0-9]$")
 			qui drop if trim(s0) == ""
 			qui compress
-			qui save "`fold'", replace
+			qui robust_save "`fold'", replace
 			qui infix str244 s 1-244 using "`fpath'/`fname'", clear
 			qui drop if regexm(s,"filesig\([0-9]+:[0-9]+\)")				// project
 			qui drop if regexm(s,"file .+ saved")							// save
@@ -1126,7 +1126,7 @@ This can only be done if the previous build was successful.
 		if `chng' {
 			qui replace chng = 1 in `i'
 			local ++nchng
-			qui save "`flist'", replace
+			qui robust_save "`flist'", replace
 		}
 		else {
 
@@ -1327,7 +1327,7 @@ Run a do-file from within a build.  The master do-file is called from
 	local dolist : char _dta[dolist]
 	gettoken enclosing_do : dolist
 	char _dta[dolist]  `fdo' `dolist'
-	qui save `"$PROJECT_buildtemp"', replace emptyok
+	qui robust_save `"$PROJECT_buildtemp"', replace emptyok
 
 
 	// Do not run the same do-file more than once.
@@ -1357,14 +1357,14 @@ Run a do-file from within a build.  The master do-file is called from
 	local do_it = r(N) == 0
 	if !`do_it' {
 		tempfile dolinks
-		qui save "`dolinks'"
+		qui robust_save "`dolinks'"
 	}
 
 
 	// Clear the links from the previous build
 	qui use "`plinks'", clear
 	qui drop if fdo == `fdo'
-	qui save "`plinks'", replace emptyok
+	qui robust_save "`plinks'", replace emptyok
 
 
 	if !`do_it' {
@@ -1441,7 +1441,7 @@ Run a do-file from within a build.  The master do-file is called from
 			qui merge fno using "`pfiles'"
 			drop _merge
 			sort fno
-			qui save "`pfiles'", replace
+			qui robust_save "`pfiles'", replace
 		}
 	}
 
@@ -1511,7 +1511,7 @@ Run a do-file from within a build.  The master do-file is called from
 		keep flink linktype
 		rename linktype linktype0
 		tempfile flinks0
-		qui save "`flinks0'"
+		qui robust_save "`flinks0'"
 
 		qui count
 		dis as text "`prompt'Skipping " as res "`dopath'/`dofile';" ///
@@ -1590,7 +1590,7 @@ Run a do-file from within a build.  The master do-file is called from
 		qui replace newlink = 1 if newlink > 1
 
 		sort fdo norder
-		qui save "`plinks'", replace
+		qui robust_save "`plinks'", replace
 
 	}
 
@@ -1599,7 +1599,7 @@ Run a do-file from within a build.  The master do-file is called from
 	local dolist : char _dta[dolist]
 	gettoken last rest : dolist
 	char _dta[dolist]  "`rest'"
-	qui save `"$PROJECT_buildtemp"', replace emptyok
+	qui robust_save `"$PROJECT_buildtemp"', replace emptyok
 
 end
 
@@ -1809,7 +1809,7 @@ project_creates. The calling programs handle -preserve-
 		qui replace cdate = 0 in `nobs'
 		qui replace relpath = `use_relpath' in `nobs'
 		sort fno
-		qui save "`pfiles'", replace
+		qui robust_save "`pfiles'", replace
 	}
 
 
@@ -1853,7 +1853,7 @@ project_creates. The calling programs handle -preserve-
 		qui replace ctime   = "`t'" in `nobs'
 
 		sort fno
-		qui save "`pfiles'", replace
+		qui robust_save "`pfiles'", replace
 	}
 	else {
 		scalar `csum' = csum[`nobs']
@@ -1946,7 +1946,7 @@ project_creates. The calling programs handle -preserve-
 
 	// Save the links to disk.
 	sort fdo norder
-	qui save "`plinks'", replace
+	qui robust_save "`plinks'", replace
 
 
 	// Display link info
@@ -2618,7 +2618,7 @@ changed since the last time the archive task was run.
 		drop _merge
 		order `: char _dta[vlist_files]'
 		sort fno
-		qui save "`pfiles'", replace
+		qui robust_save "`pfiles'", replace
 
 	}
 	else {
@@ -2868,7 +2868,7 @@ the build could be skipped the next time around.
 				qui use "`pfiles'", clear
 				char _dta[share_`sharewith'_date] "`c(current_date)'"
 				char _dta[share_`sharewith'_time] "`c(current_time)'"
-				qui save "`pfiles'", replace
+				qui robust_save "`pfiles'", replace
 			}
 		}
 
@@ -3000,7 +3000,7 @@ recursively and archives files that are not linked to the project.
 	qui drop if fname == "`pname'_files.dta"
 	qui drop if fname == "`pname'_links.dta"
 	sort fno
-	qui save "`pfiles'", replace
+	qui robust_save "`pfiles'", replace
 
 
 	// go back and clean-up old links
@@ -3012,7 +3012,7 @@ recursively and archives files that are not linked to the project.
 	qui keep if _merge == 3
 	drop _merge
 	sort fdo norder
-	qui save "`plinks'", replace
+	qui robust_save "`plinks'", replace
 
 end
 
@@ -3362,7 +3362,7 @@ List project files, according to the order they appear in the build.
 	keep fno
 	sort fno
 	tempfile dofiles
-	qui save "`dofiles'"
+	qui robust_save "`dofiles'"
 
 
 	// The master do-file is linked to all the files in the project. Use its
@@ -3458,7 +3458,7 @@ created.
 	keep fno
 	sort fno
 	tempfile dofiles
-	qui save "`dofiles'"
+	qui robust_save "`dofiles'"
 
 
 	// The master do-file is linked to all the files in the project. Reduce
@@ -3503,7 +3503,7 @@ created.
 
 
 	tempfile f
-	qui save "`f'"
+	qui robust_save "`f'"
 
 	forvalues nt = 1/5 {
 		use "`f'", clear
@@ -3721,7 +3721,7 @@ List project files alphabetically with a list of all do-files that link to them.
 
 	// This is the main sample of what we want to list.
 	tempfile fmain
-	qui save "`fmain'"
+	qui robust_save "`fmain'"
 
 
 	// Get file info for each link in the main sample. Reduce to one record
@@ -3736,7 +3736,7 @@ List project files alphabetically with a list of all do-files that link to them.
 	drop _merge
 	rename fno flink
 	tempfile lkname
-	qui save "`lkname'"
+	qui robust_save "`lkname'"
 
 
 	// Get file info on the do-files for the list of linked files in the
@@ -4206,3 +4206,19 @@ def strip_dta_timestamp(filename):
 end
 
 }
+
+program define robust_save
+	// for projects in a synced folder (e.g. Dropbox),
+	// the rapid file changes can throw file lock errors
+	// this catches those errors and pauses before trying again
+
+	version 16.0
+
+	forvalues try = 1/5 {
+		cap save `0'
+		if _rc == 608 & `try' < 5 sleep 100
+		else continue, break
+	}
+	exit _rc
+
+end
