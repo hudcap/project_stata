@@ -3054,6 +3054,9 @@ compare all files against the list of files in the project (dataset in memory).
 		// ignore OS X's folder attribute hidden file
 		if "`f'" == ".DS_Store" local doit 0
 
+		// ignore .gitignore file
+		if "`f'" == ".gitignore" local doit 0
+
 
 		if `doit' {
 
@@ -3108,6 +3111,9 @@ compare all files against the list of files in the project (dataset in memory).
 	// remove the archive directory if we are in the project's main directory
 	if "`pdir'" == "`currentdir'" ///
 		local dlist : subinstr local dlist `""archive""' ""
+
+  // remove .git directory if it exists
+  local dlist : subinstr local dlist `"".git""' ""
 
 	// continue the cleanup by travelling down each directory
 	foreach d of local dlist {
